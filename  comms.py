@@ -20,7 +20,6 @@ def send_image(filepath):
             f.send(data)
             time.sleep(2)
 
-send_image(filepath="image.jpg")
 
 
     
