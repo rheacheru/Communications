@@ -3,23 +3,23 @@ import functions
 import time
 import os
 
-f = functions.functions(c)
 def send_image(filepath):
-    size = os.path.getsize(filepath)
+    size = int(os.stat(filepath)[6])
     #password = 13
     packet = size.to_bytes(6, byteorder = "big")
     packet = bytearray(packet)
     packet[0] = 13 #password
     packet[1] = 1 #indicator for images
-    f.send(packet)
+    c.radio1.send(packet)
     with open(filepath, "rb") as stream:
         while True:
             data = stream.read(252)
             if not data:
                 break
-            f.send(data)
+            c.radio1.send(data)
+            print('sent')
             time.sleep(2)
-
+send_image('kitty.png')
 
 
     
