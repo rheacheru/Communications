@@ -1,14 +1,16 @@
-#import adafruit_rfm9x 
+# Write your code here :-)
 import pycubed_rfm9x
 import board
 import digitalio
 import busio
 import time
 
+
 CS = digitalio.DigitalInOut(board.D5)
 CS.switch_to_output(True)
 RST = digitalio.DigitalInOut(board.D6)
 RST.switch_to_output(True)
+print('hello')
 
 RADIO_FREQ_MHZ = 437.4
 node = const(0xfb)
@@ -28,10 +30,10 @@ def main1():
 
 def main2():
     print('in main2')
-    current_time = time.time()
-    path = f'/Users/shreyakolla/Programming/GISCubesat/Communications/received_images{current_time}.jpg'
-
-    if size is not None:
+    while True:
+        current_time = time.time()
+        path =f'/Volumes/CIRCUITPY/received_images/{current_time}.jpg'
+        packet = rfm9x.receive()
         with open(path, "wb+") as stream:
             while True:
                 data = rfm9x.receive()
@@ -39,6 +41,9 @@ def main2():
                     break
                 stream.write(data)
                 print('done')
+
+main2()
+
 
 
 
