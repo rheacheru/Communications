@@ -28,10 +28,10 @@ def main1():
 
 def main2():
     print('in main2')
-    current_time = time.time()
-    path = f'/Users/shreyakolla/Programming/GISCubesat/Communications/received_images{current_time}.jpg'
-
-    if size is not None:
+    while True:
+        current_time = time.time()
+        path = f'received_images/{current_time}.jpg'
+        rfm9x.receive()
         with open(path, "wb+") as stream:
             while True:
                 data = rfm9x.receive()
