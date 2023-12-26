@@ -1,11 +1,17 @@
 import paho.mqtt.client as paho
 from CIRCUITPY.secrets import secrets
+import sys
+import json
+
+
 
 # The callback for when the client receives a CONNACK response from the server.
 def on_connect(client, userdata, flags, rc, yyy):
     print("Connected with result code "+str(rc))
-    file = open("CIRCUITPY/code.py",'r')
-    client.publish(secrets['mqtt']['codetopic'], payload=file.read(), qos=0)
+    filepath = sys.argv[1]
+    file = open(f"CIRCUITPY/{filepath}",'r')
+    payload = json.dumps({"filepath": filepath, "data": file.read()}).encode('utf-8')
+    client.publish(secrets['mqtt']['codetopic'], payload =payload , qos=0)
     print("sent")
     file.close()
 
