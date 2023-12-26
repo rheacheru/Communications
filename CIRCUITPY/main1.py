@@ -1,4 +1,3 @@
-# Write your code here :-)
 import pycubed_rfm9x
 import board
 import digitalio
@@ -26,7 +25,7 @@ rfm9x = pycubed_rfm9x.RFM9x(board.SPI(), CS, RST, 437.4)
 rfm9x.spreading_factor = 8
 rfm9x.node = node
 rfm9x.destination = destination
-def main1():
+def main():
     while True:
         packet = rfm9x.receive(timeout=10)
         #print('hi')
@@ -34,31 +33,4 @@ def main1():
             print(packet)
             print(rfm9x.last_rssi)
 
-        
-
-        
-
-def main2():
-    print('in main2')
-    while True:
-        packet = rfm9x.receive(timeout=10)
-        if packet is not None:
-            current_time = time.time()
-            path =f'received_images/{current_time}.jpg'
-            size = int.from_bytes(packet, 'big')
-            print(size)
-            with open(path, "wb+") as stream:
-                count = 0
-                while count < size:
-                    data = rfm9x.receive(timeout=10)
-                    stream.write(data)
-                    count = count + 249
-                    print('done')
-            print('saved image')
-
-
-main2()
-
-
-
-
+main()

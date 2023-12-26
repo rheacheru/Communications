@@ -13,7 +13,7 @@ def send_image(filepath):
     c.radio1.send(packet)
     with open(filepath, "rb") as stream:
         while True:
-            data = stream.read(252)
+            data = stream.read(249)
             if not data:
                 break
             c.radio1.send(data)
