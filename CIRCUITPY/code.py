@@ -97,24 +97,25 @@ def main2():
     print('in main2')
     while True:
         packet = rfm9x.receive(timeout=10)
-        if packet is not None:
-            now = datetime.now()
-            current_time = now.strftime("%Y%M%D%H%M%S")
-            path =f'received_images/{current_time}.jpg'
-            print(path)
-            size = int.from_bytes(packet, 'big')
-            print(size)
-            with open(path, "wb+") as stream:
-                count = 0
-                rssi = 0
-                while count < size:
-                    data = rfm9x.receive(timeout=10)
-                    rssi = rssi + rfm9x.last_rssi
-                    stream.write(data)
-                    count = count + 249
-                    print('done')
-            print('saved image')
-            print(f'avg rssi: {rssi//((count//249)+1)}')
+        if packet is None:
+            continue
+        now = datetime.now()
+        current_time = now.strftime("%Y%M%D%H%M%S")
+        path =f'received_images/{current_time}.jpg'
+        print(path)
+        size = int.from_bytes(packet, 'big')
+        print(size)
+        with open(path, "wb+") as stream:
+            count = 0
+            rssi = 0
+            while count < size:
+                data = rfm9x.receive(timeout=10)
+                rssi = rssi + rfm9x.last_rssi
+                stream.write(data)
+                count = count + 249
+                print('done')
+        print('saved image')
+        print(f'avg rssi: {rssi//((count//249)+1)}')
 
 
 main2()
