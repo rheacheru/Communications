@@ -8,6 +8,7 @@ import adafruit_minimqtt.adafruit_minimqtt as MQTT
 import ssl
 import sys
 import json
+import zlib
 
 
 def attempt_wifi():
@@ -71,7 +72,7 @@ def connected(client, userdata, flags, rc):
 
 def mqtt_message(client, topic, payload):
     #print("[{}] {}".format(topic, payload))
-    payload = json.loads(payload)
+    payload = json.loads(zlib.decompress(payload))
     with open(payload["filepath"], 'w') as stream:
         stream.write(payload["data"])
         print('done')
