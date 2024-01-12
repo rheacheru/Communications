@@ -12,6 +12,7 @@ import rtc
 import adafruit_minimqtt.adafruit_minimqtt as MQTT
 import ssl
 from datetime import datetime
+from Communications.CIRCUITPY.post import postImage
 
 CS = digitalio.DigitalInOut(board.D12)
 CS.switch_to_output(True)
@@ -27,15 +28,6 @@ rfm9x = pycubed_rfm9x.RFM9x(board.SPI(), CS, RST, 437.4)
 rfm9x.spreading_factor = 8
 rfm9x.node = node
 rfm9x.destination = destination
-def main1():
-    while True:
-        packet = rfm9x.receive(timeout=10)
-        #print('hi')
-        if packet is not None:
-            print(packet)
-            print(rfm9x.last_rssi)
-
-        
 
 def attempt_wifi():
     # TODO: Move wifi pass and id to config
@@ -115,6 +107,7 @@ def main2():
                 count = count + 249
                 print('done')
         print('saved image')
+        postImage(path)
         print(f'avg rssi: {rssi//((count//249)+1)}')
 
 
