@@ -15,6 +15,7 @@ def on_connect(client, userdata, flags, rc, yyy):
     print("sent")
     file.close()
     client.disconnect()
+    print('disconnected')
 
 
 client = paho.Client(client_id="", userdata=None, protocol=paho.MQTTv5)
