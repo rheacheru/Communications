@@ -71,3 +71,19 @@ def postImage(filepath):
         files=files
     )
     print(response.text)
+
+def File_receive(filepath, size):
+    with open(filepath, "wb+") as stream:
+            count = 0
+            rssi = 0
+            while count < size:
+                data = rfm9x.receive(timeout=10)
+                rssi = rssi + rfm9x.last_rssi
+                stream.write(data)
+                count = count + 249
+                print('done')
+    print(f'saved image, avg rssi: {rssi//((count//249)+1)}')
+
+
+def Serial_send(filepath):
+     pass
