@@ -1,7 +1,7 @@
 import json
 import time
-import requests
-from jwt import JWT, jwk_from_pem
+import adafruit_requests
+from adafruit_jwt import JWT, jwk_from_pem
 from datetime import datetime
 import sys
 from pathlib import Path
@@ -9,7 +9,7 @@ from pathlib import Path
 # Load your service account credentials
 
 
-def post_image(filepath):
+def post_image(filepath, pool):
     with open('ihscubesat-c9dc08a671e1.json', 'r') as f:
         sa_credentials = json.load(f)
     # Prepare the JWT Claims
@@ -31,6 +31,7 @@ def post_image(filepath):
     private_key = jwk_from_pem(bytes(sa_credentials['private_key'], 'utf-8'))
     signed_jwt = jwt_instance.encode(payload, private_key, 'RS256')
     # Get the access token
+    requests = adafruit_requests.Session(pool)
     token_response = requests.post(
         'https://oauth2.googleapis.com/token',
         headers={'Content-Type': 'application/x-www-form-urlencoded'},

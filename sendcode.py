@@ -2,7 +2,6 @@ import paho.mqtt.client as paho
 from CIRCUITPY.secrets import secrets
 import sys
 import json
-import zlib
 
 
 
@@ -12,7 +11,6 @@ def on_connect(client, userdata, flags, rc, yyy):
     filepath = sys.argv[1]
     file = open(f"CIRCUITPY/{filepath}",'r')
     payload = json.dumps({"filepath": filepath, "data": file.read()}).encode('utf-8')
-    payload = zlib.compress(payload)
     client.publish(secrets['mqtt']['codetopic'], payload =payload , qos=0)
     print("sent")
     file.close()
