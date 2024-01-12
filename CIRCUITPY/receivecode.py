@@ -75,6 +75,9 @@ def mqtt_message(client, topic, payload):
     with open(payload["filepath"], 'w') as stream:
         stream.write(payload["data"])
         print('done')
+    client.disconnect()
+    print('disconnected')
+    
         
     
 
