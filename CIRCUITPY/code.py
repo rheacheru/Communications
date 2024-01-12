@@ -13,7 +13,7 @@ import adafruit_minimqtt.adafruit_minimqtt as MQTT
 import ssl
 from datetime import datetime
 import traceback
-from comms import postImage, File_receive
+from comms import post_image, file_receive
 
 CS = digitalio.DigitalInOut(board.D12)
 CS.switch_to_output(True)
@@ -91,12 +91,11 @@ while True:
         packet = rfm9x.receive(timeout=10)
         if packet is None:
             continue
-
         filepath =f'received_images/{datetime.now().strftime("%Y%M%D%H%M%S")}.jpg'
         size = int.from_bytes(packet, 'big')
         print(size)
-        File_receive(filepath, size)
-        postImage(filepath)
+        file_receive(filepath, size, rfm9x)
+        post_image(filepath)
 
     except Exception as e:
         print("Error in Main Loop: " + ''.join(traceback.format_exception(e)))
