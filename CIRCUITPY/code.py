@@ -12,7 +12,8 @@ import rtc
 import adafruit_minimqtt.adafruit_minimqtt as MQTT
 import ssl
 from datetime import datetime
-from Communications.CIRCUITPY.post import postImage
+import traceback
+from comms import postImage, File_receive
 
 CS = digitalio.DigitalInOut(board.D12)
 CS.switch_to_output(True)
@@ -84,34 +85,24 @@ def synctime(pool):
 
 
 
-def main2():
-    pool = attempt_wifi()
-    print('in main2')
-    while True:
+pool = attempt_wifi()
+while True:
+    try:
         packet = rfm9x.receive(timeout=10)
         if packet is None:
             continue
-        now = datetime.now()
-        current_time = now.strftime("%Y%M%D%H%M%S")
-        path =f'received_images/{current_time}.jpg'
-        print(path)
+
+        filepath =f'received_images/{datetime.now().strftime("%Y%M%D%H%M%S")}.jpg'
         size = int.from_bytes(packet, 'big')
         print(size)
-        with open(path, "wb+") as stream:
-            count = 0
-            rssi = 0
-            while count < size:
-                data = rfm9x.receive(timeout=10)
-                rssi = rssi + rfm9x.last_rssi
-                stream.write(data)
-                count = count + 249
-                print('done')
-        print('saved image')
-        postImage(path)
-        print(f'avg rssi: {rssi//((count//249)+1)}')
+        File_receive(filepath, size)
+        postImage(filepath)
+
+    except Exception as e:
+        print("Error in Main Loop: " + ''.join(traceback.format_exception(e)))
 
 
-main2()
+
 
 
 
