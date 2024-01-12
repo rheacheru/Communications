@@ -108,7 +108,6 @@ def set_up_mqtt(pool):
 
 pool = attempt_wifi()
 mqtt_client = set_up_mqtt(pool)
-while True:
-
+while mqtt_client.is_connected():
     mqtt_client.loop()
     time.sleep(3)
