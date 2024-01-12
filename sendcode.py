@@ -14,6 +14,7 @@ def on_connect(client, userdata, flags, rc, yyy):
     client.publish(secrets['mqtt']['codetopic'], payload =payload , qos=0)
     print("sent")
     file.close()
+    client.disconnect()
 
 
 client = paho.Client(client_id="", userdata=None, protocol=paho.MQTTv5)
