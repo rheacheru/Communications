@@ -95,7 +95,7 @@ while True:
         size = int.from_bytes(packet, 'big')
         print(size)
         file_receive(filepath, size, rfm9x)
-        post_image(filepath)
+        post_image(filepath, pool)
 
     except Exception as e:
         print("Error in Main Loop: " + ''.join(traceback.format_exception(e)))
