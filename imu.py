@@ -18,7 +18,7 @@ while True:
     accelx, accely, accelz = sensor1.acceleration
     accelz = accelz - 9.8
     accel_value = math.sqrt(math.pow(accelx, 2)+ math.pow(accely, 2)+ math.pow(accelz, 2))
-    print(accel_value)
+    print(f'accel: {accel_value}, max: {max}')
     if accel_value > max:
         max = accel_value
     time.sleep(1)
