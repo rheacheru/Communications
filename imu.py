@@ -11,7 +11,6 @@ import os
 i2c = busio.I2C(board.SCL, board.SDA)
 sensor1 = LSM6DSOX(i2c)
 camera = Picamera2()
-camera.resolution = (64,64)
 THRESHOLD = 18
 max = 0
 
