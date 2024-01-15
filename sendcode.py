@@ -9,7 +9,7 @@ import json
 def on_connect(client, userdata, flags, rc, yyy):
     print("Connected with result code "+str(rc))
     filepath = sys.argv[1]
-    file = open(f"CIRCUITPY/{filepath}",'r')
+    file = open(filepath,'r')
     payload = json.dumps({"filepath": filepath, "data": file.read()}).encode('utf-8')
     client.publish(secrets['mqtt']['codetopic'], payload =payload , qos=0)
     print("sent")
