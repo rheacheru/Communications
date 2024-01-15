@@ -2,7 +2,6 @@ import paho.mqtt.client as paho
 from CIRCUITPY.secrets import secrets
 import sys
 import json
-from base64 import b64encode
 
 
 

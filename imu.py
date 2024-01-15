@@ -6,6 +6,7 @@ import time
 import math
 from datetime import datetime
 import os
+from PIL import Image
 
 
 i2c = busio.I2C(board.SCL, board.SDA)
@@ -26,6 +27,10 @@ while True:
         camera.start_and_capture_file(filename, show_preview =False)
         filepath = f'/home/kaitlyntseng/Programming/Communications/{filename}'
         camera.stop()
+        print('resizing image')
+        resized_image = Image.open(filepath)
+        new_image = resized_image.resize((320, 240))
+        new_image.save(filepath)
         print('sending to mqtt')
         os.system(f'python /home/kaitlyntseng/Programming/Communications/pi_sendcode.py {filepath}')
     time.sleep(1)
