@@ -24,7 +24,7 @@ while True:
         time.sleep(5)
         filename = f'pi_images_to_send/{datetime.now().strftime("%Y%m%d%H%M%S")}.jpg'
         camera.start_and_capture_file(filename, show_preview =False)
-        filepath = f'/home/kaitlyntseng/Programming/Communications/pi_images_to_send/{filename}'
+        filepath = f'/home/kaitlyntseng/Programming/Communications/{filename}'
         camera.stop()
         print('sending to mqtt')
         os.system(f'python /home/kaitlyntseng/Programming/Communications/sendcode.py {filepath}')
