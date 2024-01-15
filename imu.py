@@ -22,7 +22,7 @@ while True:
     if(accel_value > THRESHOLD):
         print('taking pic in 5 seconds get ready!')
         time.sleep(5)
-        filename = f'{datetime.now().strftime("%Y%m%d%H%M%S")}.jpg'
+        filename = f'pi_images_to_send/{datetime.now().strftime("%Y%m%d%H%M%S")}.jpg'
         camera.start_and_capture_file(filename, show_preview =False)
         filepath = f'/home/kaitlyntseng/Programming/Communications/pi_images_to_send/{filename}'
         camera.stop()
