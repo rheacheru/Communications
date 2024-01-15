@@ -27,7 +27,7 @@ while True:
         filepath = f'/home/kaitlyntseng/Programming/Communications/{filename}'
         camera.stop()
         print('sending to mqtt')
-        os.system(f'python /home/kaitlyntseng/Programming/Communications/sendcode.py {filepath}')
+        os.system(f'python /home/kaitlyntseng/Programming/Communications/pi_sendcode.py {filepath}')
     time.sleep(1)
 
 
