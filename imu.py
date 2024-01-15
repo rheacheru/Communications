@@ -15,9 +15,7 @@ camera.resolution = (64,64)
 THRESHOLD = 18
 max = 0
 
-def main():
-    pass
-
+print('shake imu to take picture')
 while True:
     accelx, accely, accelz = sensor1.acceleration
     accelz = accelz - 9.8
