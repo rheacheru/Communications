@@ -17,7 +17,6 @@ def on_connect(client, userdata, flags, rc, yyy):
     client.disconnect()
     print('disconnected')
 
-
 client = paho.Client(client_id="", userdata=None, protocol=paho.MQTTv5)
 client.tls_set(tls_version=paho.ssl.PROTOCOL_TLS)
 client.username_pw_set(secrets["mqtt"]["username"],secrets['mqtt']['password'])
