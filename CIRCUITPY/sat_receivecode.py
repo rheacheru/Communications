@@ -73,7 +73,7 @@ def connected(client, userdata, flags, rc):
 def mqtt_message(client, topic, payload):
     #print("[{}] {}".format(topic, payload))
     payload = json.loads(payload)
-    with open(payload["filepath"], mode ='w', decoding='utf-8', errors='ignore') as stream:
+    with open(payload["filepath"], mode ='w', decoding='utf-8', errors='ignore') as stream: #CHANGES MADE HERE
         stream.write(b64decode(payload["data"]))
         print('done')
     client.disconnect()
