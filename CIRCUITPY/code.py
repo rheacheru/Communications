@@ -14,6 +14,8 @@ import ssl
 from adafruit_datetime import datetime
 import traceback
 from comms import file_receive
+import os
+
 
 CS = digitalio.DigitalInOut(board.D20)
 CS.switch_to_output(True)
@@ -93,42 +95,45 @@ while True:
         if packet is None:
             continue
         filepath =f'received_telemetry/{datetime.now().isoformat()}.txt'
-		rfm9x.send(bytes("IRVCB", "UTF-8"))
-		packet = rfm9x.receive(timeout=10)
-		
+        with open(filepath, 'w') as f:
+            f.write(packet)
+        rfm9x.send("IRVCB")
+
+        packet = rfm9x.receive(timeout=10)
         size = int.from_bytes(packet[1:5], 'little')
         print(size)
-		packet_count = (size-1)//244+1
-		
-		image_name = datetime.now().isoformat()
-		folder_path = f"received_images/{image_name}"
-		os.mkdir(folder_path)
-		with open(f"{folder_path}/packet_0.raw","wb") as f:
-			f.write(packet[5:])
-		
-		count = 1
-		request_packet_list = [0]*packet_count # 0 for not received correctly, 1 for received correctly
-		
-		while count < packet_count:
-			packet = rfm9x.receive(timeout=10)
-			if chr(packet[0]) == '1' and len(packet) == 249:
-				packet_number = int.from_bytes(packet[1:5], 'little')
-				with open(f"{folder_path}/packet_{packet_number}.raw","wb") as f:
-					f.write(packet[5:])
-				request_packet_list[packet_number] = 1
-				count += 1
-			elif len(packet) < 249:
-				print("wrong length")
-				with open(f"corrupted/{datetime.now().isoformat()}.raw","w") as f:
-					f.write(packet)
-			else:
-				print("not 1 at beginning")
-				with open(f"corrupted/{datetime.now().isoformat()}.raw","w") as f:
-					f.write(packet)
-		
-        # file_receive(filepath, size, rfm9x)
-        #post_image(filepath, pool)
+        packet_count = (size-1)//244+1
+        image_name = datetime.now().isoformat()
+        folder_path = f"received_images/{image_name}"
+        os.mkdir(folder_path)
+        with open(f"{folder_path}/packet_0.raw","wb") as f:
+            f.write(packet[5:])
+        count = 1
+        request_packet_list = [0]*packet_count # 0 for not received correctly, 1 for received correctly
+
+        while count < packet_count:
+            packet = rfm9x.receive(timeout=10)
+            if chr(packet[0]) == '1' and len(packet) == 249:
+                packet_number = int.from_bytes(packet[1:5], 'little')
+                with open(f"{folder_path}/packet_{packet_number}.raw","wb") as f:
+                    f.write(packet[5:])
+                request_packet_list[packet_number] = 1
+                count += 1
+            elif len(packet) < 249:
+                print("wrong length")
+                with open(f"corrupted/{datetime.now().isoformat()}.raw","w") as f:
+                    f.write(packet)
+            else:
+                print("not 1 at beginning")
+                with open(f"corrupted/{datetime.now().isoformat()}.raw","w") as f:
+                    f.write(packet)
 
     except Exception as e:
         print("Error in Main Loop: " + ''.join(traceback.format_exception(e)))
+
+
+
+
+
+
 
