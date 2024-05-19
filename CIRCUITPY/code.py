@@ -94,12 +94,15 @@ while True:
         packet = rfm9x.receive(timeout=10)
         if packet is None:
             continue
-        filepath =f'received_telemetry/{datetime.now().isoformat()}.txt'
+        filepath =f'received_telemetry/{datetime.now().isoformat()}.txt'.replace(":", "-")
         with open(filepath, 'w') as f:
             f.write(packet)
         rfm9x.send("IRVCB")
 
         packet = rfm9x.receive(timeout=10)
+		if packet[0] != b"1": # not an image packet
+			continue
+		
         size = int.from_bytes(packet[1:5], 'little')
         print(size)
         packet_count = (size-1)//244+1
@@ -127,6 +130,8 @@ while True:
                 print("not 1 at beginning")
                 with open(f"corrupted/{datetime.now().isoformat()}.raw","w") as f:
                     f.write(packet)
+		packet = rfm9x.receive(timeout=10)
+		print(packet)
 
     except Exception as e:
         print("Error in Main Loop: " + ''.join(traceback.format_exception(e)))
