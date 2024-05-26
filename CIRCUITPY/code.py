@@ -11,11 +11,15 @@ import adafruit_requests
 import rtc
 import adafruit_minimqtt.adafruit_minimqtt as MQTT
 import ssl
-from datetime import datetime
+from adafruit_datetime import datetime
+import traceback
+from comms import file_receive
+import os
 
-CS = digitalio.DigitalInOut(board.D12)
+
+CS = digitalio.DigitalInOut(board.D20)
 CS.switch_to_output(True)
-RST = digitalio.DigitalInOut(board.D13)
+RST = digitalio.DigitalInOut(board.D21)
 RST.switch_to_output(True)
 print('hello')
 
@@ -27,15 +31,6 @@ rfm9x = pycubed_rfm9x.RFM9x(board.SPI(), CS, RST, 437.4)
 rfm9x.spreading_factor = 8
 rfm9x.node = node
 rfm9x.destination = destination
-def main1():
-    while True:
-        packet = rfm9x.receive(timeout=10)
-        #print('hi')
-        if packet is not None:
-            print(packet)
-            print(rfm9x.last_rssi)
-
-        
 
 def attempt_wifi():
     # TODO: Move wifi pass and id to config
@@ -90,35 +85,72 @@ def synctime(pool):
     except Exception as e:
         print('[WARNING]', e)
 
+def main():
+	pool = attempt_wifi()
+	#print("Waiting for messages...")
+	while True:
+		try:
+			print('Waiting for messages....')
+			packet = rfm9x.receive(timeout=10)
+			if packet is None:
+				continue
+			
+			print("Telemetry packet received.")
+			filename = datetime.now().isoformat().replace(":","-")
+			filepath =f'received_telemetry/{filename}.txt'
+			with open(filepath, 'w') as f:
+				f.write(packet)
+				print(f"Telemetry packet written to {filepath}")
+			rfm9x.send("IRVCB")
 
+			packet = rfm9x.receive(timeout=10)
+			if packet[0] != 1: # not an image packet
+				print("Non-image packet received, rejected")
+				continue
+			print("First image packet received")
+			
+			size = int.from_bytes(packet[1:5], 'little')
+			packet_count = (size-1)//244+1
+			print(f"Image is of size {size} bytes, requiring {packet_count} packets")
+			folder_path = f"received_images/{filename}"
+			os.mkdir(folder_path)
+			with open(f"{folder_path}/packet_1.raw","wb") as f:
+				f.write(packet[5:])
+			print("Wrote first image packet")
+			request_packet_list = [0]*packet_count # 0 for not received correctly, 1 for received correctly
+			request_packet_list[0] = 1
+			for packet_index in range(2, packet_count+1):
+				packet = rfm9x.receive(timeout=10)
+				if packet[0] == 1:
+					packet_number = int.from_bytes(packet[1:5], 'little')
+					packet_path = f"{folder_path}/packet_{packet_number}.raw"
+					with open(packet_path, "wb") as f:
+						f.write(packet[5:])
+					request_packet_list[packet_number-1] = 1
+					print('received')
+				'''elif len(packet) != 249:
+					packet_path = f"corrupted/{datetime.now().isoformat()}.raw"
+					with open(packet_path, "w") as f:
+						f.write(packet)
+						print(f"Packet {packet_path} has length {len(packet)}, not 249")
+				elif packet[0] != 1:
+					packet_path = f"corrupted/{datetime.now().isoformat()}.raw"
+					with open(packet_path, "w") as f:
+						f.write(packet)
+						print("not 1 at beginning")'''
+			with open(f'received_images/{filename}.jpg', 'wb') as stream1:
+				image_collection = os.listdir(folder_path)
+				for image_file in image_collection:
+					with open(f'received_images/{filename}/{image_file}', 'rb') as stream2:
+						image_data = stream2.read()
+					stream1.write(image_data)
+			print('image created')
 
-def main2():
-    pool = attempt_wifi()
-    print('in main2')
-    while True:
-        packet = rfm9x.receive(timeout=10)
-        if packet is not None:
-            now = datetime.now()
-            current_time = now.strftime("%Y%M%D%H%M%S")
-            path =f'received_images/{current_time}.jpg'
-            print(path)
-            size = int.from_bytes(packet, 'big')
-            print(size)
-            with open(path, "wb+") as stream:
-                count = 0
-                rssi = 0
-                while count < size:
-                    data = rfm9x.receive(timeout=10)
-                    rssi = rssi + rfm9x.last_rssi
-                    stream.write(data)
-                    count = count + 249
-                    print('done')
-            print('saved image')
-            print(f'avg rssi: {rssi//((count//249)+1)}')
+			packet = rfm9x.receive(timeout=10)
+			print(packet)
 
+		except Exception as e:
+			print("Error in Main Loop: " + ''.join(traceback.format_exception(e)))
 
-main2()
-
-
-
-
+if __name__ == "__main__":
+	main()
