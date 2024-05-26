@@ -8,7 +8,7 @@ import adafruit_minimqtt.adafruit_minimqtt as MQTT
 import ssl
 import sys
 import json
-import zlib
+from base64 import b64decode
 
 
 def attempt_wifi():
@@ -72,10 +72,13 @@ def connected(client, userdata, flags, rc):
 
 def mqtt_message(client, topic, payload):
     #print("[{}] {}".format(topic, payload))
-    payload = json.loads(zlib.decompress(payload))
-    with open(payload["filepath"], 'w') as stream:
-        stream.write(payload["data"])
+    payload = json.loads(payload)
+    with open(payload["filepath"], mode ='w', decoding='utf-8', errors='ignore') as stream: #CHANGES MADE HERE
+        stream.write(b64decode(payload["data"]))
         print('done')
+    client.disconnect()
+    print('disconnected')
+    
         
     
 
@@ -104,10 +107,10 @@ def set_up_mqtt(pool):
     
     return mqtt_client
 
-print('v4')
 pool = attempt_wifi()
 mqtt_client = set_up_mqtt(pool)
 while True:
-
     mqtt_client.loop()
+    if(not mqtt_client.is_connected()):
+        break
     time.sleep(3)

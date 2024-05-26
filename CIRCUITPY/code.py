@@ -86,6 +86,7 @@ def synctime(pool):
         print('[WARNING]', e)
 
 def main():
+<<<<<<< HEAD
 	pool = attempt_wifi()
 	#print("Waiting for messages...")
 	while True:
@@ -154,3 +155,75 @@ def main():
 
 if __name__ == "__main__":
 	main()
+=======
+    pool = attempt_wifi()
+    while True:
+        try:
+            print('Waiting for messages....')
+            packet = rfm9x.receive(timeout=10)
+            if packet is None:
+                continue
+            
+            print("Telemetry packet received.")
+            filepath =f'received_telemetry/{datetime.now().isoformat()}.txt'.replace(":", "-")
+            with open(filepath, 'w') as f:
+                f.write(packet)
+                print(f"Telemetry packet written to {filepath}")
+            rfm9x.send("IRVCB")
+
+            packet = rfm9x.receive(timeout=10)
+            if packet[0] != 1: # not an image packet
+                print("Non-image packet received, rejected")
+                continue
+            print("First image packet received")
+            
+            size = int.from_bytes(packet[1:5], 'little')
+            packet_count = (size-1)//244+1
+            print(f"Image is of size {size} bytes, requiring {packet_count} packets")
+            image_name = datetime.now().isoformat()
+            folder_path = f"received_images/{image_name}"
+            os.mkdir(folder_path)
+            packet_path = f"{folder_path}/packet_1.raw"
+            with open(packet_path,"wb") as f:
+                f.write(packet[5:])
+                print(f"Packet {packet_path} successfully saved")
+            
+            request_packet_list = [0]*packet_count # 0 for not received correctly, 1 for received correctly
+            request_packet_list[0] = 1
+            while True:
+                packet = rfm9x.receive(timeout=10)
+                if packet is None:
+                    print("Stopped receiving packets. Packet status list:")
+                    print(request_packet_list)
+                    break
+                if packet[0] == 1 and len(packet) == 249:
+                    packet_number = int.from_bytes(packet[1:5], 'little')
+                    packet_path = f"{folder_path}/packet_{packet_number}.raw"
+                    with open(packet_path, "wb") as f:
+                        f.write(packet[5:])
+                        print(f"Packet {packet_path} successfully saved")
+                    request_packet_list[packet_number-1] = 1
+                    if packet_number == packet_count:
+                        print("Final packet was received. Packet status list:")
+                        print(request_packet_list)
+                        break
+                elif len(packet) != 249:
+                    packet_path = f"corrupted/{datetime.now().isoformat()}.raw"
+                    with open(packet_path, "wb") as f:
+                        f.write(packet)
+                        print(f"Packet {packet_path} has length {len(packet)}, not 249")
+                else: # packet[0] != 1
+                    packet_path = f"corrupted/{datetime.now().isoformat()}.raw"
+                    with open(packet_path, "wb") as f:
+                        f.write(packet)
+                        print(f"Packet {packet_path} starts with non-1")
+                
+            packet = rfm9x.receive(timeout=10)
+            print("Packet following image: ", packet)
+
+        except Exception as e:
+            print("Error in Main Loop: " + ''.join(traceback.format_exception(e)))
+
+if __name__ == "__main__":
+    main()
+>>>>>>> 6c70382d5516e562001d48abc6bb5051947d1263
