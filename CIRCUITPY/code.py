@@ -15,22 +15,10 @@ from adafruit_datetime import datetime
 import traceback
 from comms import file_receive
 import os
+from ptp import AsyncPacketTransferProtocol
+from ftp import FileTransferProtocol
 
 
-CS = digitalio.DigitalInOut(board.D20)
-CS.switch_to_output(True)
-RST = digitalio.DigitalInOut(board.D21)
-RST.switch_to_output(True)
-print('hello')
-
-RADIO_FREQ_MHZ = 437.4
-node = const(0xfb)
-destination = const(0xfa)
-
-rfm9x = pycubed_rfm9x.RFM9x(board.SPI(), CS, RST, 437.4)
-rfm9x.spreading_factor = 8
-rfm9x.node = node
-rfm9x.destination = destination
 
 def attempt_wifi():
     # TODO: Move wifi pass and id to config
@@ -85,23 +73,78 @@ def synctime(pool):
     except Exception as e:
         print('[WARNING]', e)
 
+
+
 def main():
+    CS = digitalio.DigitalInOut(board.D20)
+    CS.switch_to_output(True)
+    RST = digitalio.DigitalInOut(board.D21)
+    RST.switch_to_output(True)
+    print('hello')
+
+    RADIO_FREQ_MHZ = 437.4
+    node = const(0xfb)
+    destination = const(0xfa)
+    MAX_PACKET_SIZE = 250
+
+    radio = pycubed_rfm9x.RFM9x(board.SPI(), CS, RST, 437.4)
+    radio.spreading_factor = 8
+    radio.node = node
+    radio.destination = destination
+    radio.enable_crc(True)
+    
     pool = attempt_wifi()
+    
+    PTP = AsyncPacketTransferProtocol(radio, packet_size=MAX_PACKET_SIZE, timeout=10, log=False)
+    FTP = FileTransferProtocol(PTP, log=False)
+    
+    # async def send_packet(self, packet_type, payload, sequence_num=2**15 - 1):
+    
     while True:
         try:
-            print('Waiting for messages....')
-            packet = rfm9x.receive(timeout=10)
+            print('Waiting for telemetry ping (handshake 1)')
+            
+            packet = radio.receive(timeout=10)
             if packet is None:
                 continue
+            packet = packet.decode("utf-8")
+            if packet != "#IRVCB":
+                continue
+            print("Telemetry ping (handshake 1) received")
             
-            print("Telemetry packet received.")
-            filepath =f'received_telemetry/{datetime.now().isoformat()}.txt'.replace(":", "-")
-            with open(filepath, 'w') as f:
-                f.write(packet)
-                print(f"Telemetry packet written to {filepath}")
-            rfm9x.send("IRVCB")
+            radio.send(b"#IRVCBH2")
+            print("Handshake 2 sent, waiting for handshake 3")
+            
+            # filepath =f'received_telemetry/{datetime.now().isoformat()}.txt'.replace(":", "-")
+            # with open(filepath, 'w') as f:
+            #     f.write(packet)
+            #     print(f"Telemetry packet written to {filepath}")
+            # radio.send("IRVCB")
 
-            packet = rfm9x.receive(timeout=10)
+            packet = radio.receive(timeout=10)
+            if packet is None:
+                continue
+            identifier = packet[0:8].decode("utf-8")
+            if identifier != "#IRVCBH3":
+                continue
+            print("Handshake 3 received")
+            
+            image_count = int.from_bytes(packet[8:12], "little")
+            print(f"CubeSat has taken {image_count} images so far")
+            
+            # Start listening for image packets
+            while True:
+                packet_list, missing = FTP._receive_file()
+                if packet_list is None:
+                    break
+                print(packet_list)
+                print(missing)
+            
+            # Request images or return to standby
+            
+            
+            '''
+            
             if packet[0] != 1: # not an image packet
                 print("Non-image packet received, rejected")
                 continue
@@ -121,7 +164,7 @@ def main():
             request_packet_list = [0]*packet_count # 0 for not received correctly, 1 for received correctly
             request_packet_list[0] = 1
             while True:
-                packet = rfm9x.receive(timeout=10)
+                packet = radio.receive(timeout=10)
                 if packet is None:
                     print("Stopped receiving packets. Packet status list:")
                     print(request_packet_list)
@@ -148,9 +191,11 @@ def main():
                         f.write(packet)
                         print(f"Packet {packet_path} starts with non-1")
                 
-            packet = rfm9x.receive(timeout=10)
+            packet = radio.receive(timeout=10)
             print("Packet following image: ", packet)
-
+            
+            '''
+        
         except Exception as e:
             print("Error in Main Loop: " + ''.join(traceback.format_exception(e)))
 

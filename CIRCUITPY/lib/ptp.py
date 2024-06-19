@@ -7,16 +7,17 @@ import msgpack
 class AsyncPacketTransferProtocol:
     """A simple transfer protocol for commands and data"""
 
-    def __init__(self, protocol, packet_size=252, log=False):
+    def __init__(self, protocol, packet_size=252, timeout=1, log=False):
         self.protocol = protocol
-        self.packet_size = 252
+        self.packet_size = packet_size
+        self.timeout = timeout
         self.log = log
         self.tmp_stream = io.BytesIO()
         self.out_stream = io.BytesIO()
         self.data_packet = 0
         self.cmd_packet = 1
         self.header_len = 3
-        self.max_packet_total_size = 252
+        self.max_packet_total_size = packet_size
         self.max_data_len = self.max_packet_total_size - self.header_len
 
     def write_packet_into_out_stream(self, packet_type, payload, sequence_num):
@@ -118,9 +119,14 @@ class AsyncPacketTransferProtocol:
         return True
 
     async def receive_packet(self):
-        data = await self.protocol.read(3)
-        if data is None:
+        # data = await self.protocol.read(3)
+        # if data is None:
+        #     return False, False
+        packet = self.protocol.receive(timeout=self.timeout)
+        if packet is None:
             return False, False
+        data = packet[0:3]
+        
         header_arr = bytearray(data)
         header = int.from_bytes(header_arr[0:3], "big")
         packet_type = header >> 23

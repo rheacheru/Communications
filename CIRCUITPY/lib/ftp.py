@@ -57,6 +57,22 @@ class FileTransferProtocol:
                 os.sync()
             return missing
     
+    async def _receive_file(self):
+        num_packets, sequence_number = await self.ptp.receive_packet()
+        if num_packets is False:
+            return None, None
+        num_packets = abs(num_packets)
+        if self.log:
+            print(f"expecting to receive {num_packets} packets")
+        packet_list = [None for i in range(num_packets)]
+        missing = [1 for i in range(num_packets)]
+        for packet_num in range(num_packets):
+            chunk, packet_num_recvc = await self.ptp.receive_packet()
+            packet_list[packet_num_recvc] = chunk
+            missing[packet_num_recvc] = 0
+            os.sync()
+        return packet_list, missing
+    
     async def receive_file_sync(self, local_path):
         num_packets, sequence_number = self.ptp.receive_packet_sync()
         num_packets = abs(num_packets)
