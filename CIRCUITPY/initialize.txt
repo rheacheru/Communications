@@ -1,0 +1,19 @@
+# Scripts to initialize ground station and satellite communications
+
+# Ground station
+
+import new_protocol_receive
+import asyncio
+asyncio.run(new_protocol_receive.main())
+
+# Satellite
+
+import new_protocol_send
+import asyncio
+asyncio.run(new_protocol_send.main())
+
+# Change permissions
+
+import change_permissions
+change_permissions.main()
+
