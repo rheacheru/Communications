@@ -8,19 +8,20 @@ import time
 import os
 import asyncio
 
+import radio_diagnostics
 from new_comms_protocol import ptp, ftp
 
 # Chip's buffer size: 256 bytes
 # pycubed_rfm9x header size: 4 bytes
 # pycubed_rfm9x CRC16 checksum size: 2 bytes (not sure if this takes away from available bytes)
-# ptp header size: 3 bytes
-MAX_PACKET_SIZE = 256 - 4 - 2 - 3 # 247
+# ptp header size: 6 bytes
+MAX_PACKET_SIZE = 256 - 4 - 2 - 6 # 244
 # msgpack apparently adds 2 bytes overhead for bytes payloads
-MAX_PAYLOAD_SIZE = MAX_PACKET_SIZE - 2 # 245
+MAX_PAYLOAD_SIZE = MAX_PACKET_SIZE - 2 # 242
 TEST_IMAGE_PATH = "THBBlueEarthTest.jpeg"
 
 async def main():
-	print("Initializing main loop")
+	print("Irvington CubeSat's Test Satellite Board")
 	
 	spi0   = busio.SPI(board.SPI0_SCK,board.SPI0_MOSI,board.SPI0_MISO)
 	_rf_cs1 = digitalio.DigitalInOut(board.SPI0_CS0)
@@ -35,8 +36,10 @@ async def main():
 	radio1.enable_crc=True
 	radio1.ack_delay=0.2
 	
-	PTP = ptp.AsyncPacketTransferProtocol(radio1, packet_size=MAX_PACKET_SIZE, timeout=10, log=True)
-	FTP = ftp.FileTransferProtocol(PTP, chunk_size=MAX_PAYLOAD_SIZE, packet_delay=3, log=True)
+	PTP = ptp.AsyncPacketTransferProtocol(radio1, packet_size=MAX_PACKET_SIZE, timeout=10, log=False)
+	FTP = ftp.FileTransferProtocol(PTP, chunk_size=MAX_PAYLOAD_SIZE, packet_delay=0, log=True)
+	
+	radio_diagnostics.report_diagnostics(radio1)
 	
 	while True:
 		try:
@@ -57,10 +60,10 @@ async def main():
 			radio1.send(packet)
 			
 			print("Sending a picture")
-			await FTP.send_file(TEST_IMAGE_PATH)
+			await FTP.send_file(TEST_IMAGE_PATH, file_id=69)
 			
-			print("5-sec cooldown period")
-			time.sleep(5)
+			print("20-sec cooldown period")
+			time.sleep(20)
 		
 		except Exception as e:
 			print("Error in Main Loop: "+ ''.join(traceback.format_exception(e)))
