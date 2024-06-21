@@ -3,6 +3,7 @@
 ====================================================
 
 Simple CircuitPython compatible file transfer protocol
+Modified for pycubed_rfm9x
 
 * Author(s): 
  - Flynn Dreilinger
@@ -13,15 +14,18 @@ Implementation Notes
 """
 import os
 import math
+import time 
+import asyncio
 
 class FileTransferProtocol:
 
-    def __init__(self, ptp, log=False):
+    def __init__(self, ptp, chunk_size=252, packet_delay=0.5, log=False):
         self.ptp = ptp
         self.log = log
         self.request_file_cmd = 's'
         self.request_partial_file_cmd = 'e'
-        self.chunk_size = 245
+        self.chunk_size = chunk_size # Modified
+        self.packet_delay = packet_delay # Modified
 
     async def request_file(self, remote_path, local_path, retries=3):
         if self.log: print("PyCubed requesting file now")
@@ -43,7 +47,8 @@ class FileTransferProtocol:
             missing = await self.receive_partial_file(local_path, missing)
             retries -= 1
         return False
-
+    
+    
     async def receive_file(self, local_path):
         num_packets, sequence_number = await self.ptp.receive_packet()
         num_packets = abs(num_packets)
@@ -70,7 +75,8 @@ class FileTransferProtocol:
             chunk, packet_num_recvc = await self.ptp.receive_packet()
             packet_list[packet_num_recvc] = chunk
             missing[packet_num_recvc] = 0
-            os.sync()
+            if self.log:
+                print(f"{missing.count(0)} packets of {num_packets} received")
         return packet_list, missing
     
     async def receive_file_sync(self, local_path):
@@ -134,14 +140,22 @@ class FileTransferProtocol:
                 self.ptp.data_packet,
                  - math.ceil(filesize / self.chunk_size)
             )
+            print("alr")
 
             # send all the chunks
             for chunk, packet_num in self._read_chunks(f, self.chunk_size):
-                await self.ptp.send_packet(
+                print(f"Sending packet {packet_num} in {self.packet_delay} s")
+                await asyncio.sleep(self.packet_delay)
+                print(f"Transmitting packet {packet_num}")
+                success = await self.ptp.send_packet(
                     self.ptp.data_packet,
                     chunk,
                     packet_num
                 )
+                if not success:
+                    print(f"Failed to send packet {packet_num}")
+                else:
+                    print(f"Packet {packet_num} sent")
 
     def send_file_sync(self, filename):
         """Send a file
@@ -159,6 +173,7 @@ class FileTransferProtocol:
             self.ptp.send_data_packet_sync(
                  - math.ceil(filesize / self.chunk_size)
             )
+            print("ok")
 
             # send all the chunks
             for chunk, packet_num in self._read_chunks(f, self.chunk_size):

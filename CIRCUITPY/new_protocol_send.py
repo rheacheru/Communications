@@ -6,51 +6,20 @@ import traceback
 
 import time
 import os
+import asyncio
 
 from new_comms_protocol import ptp, ftp
 
-
-
-'''
-while True:
-    try:
-        radio1.send("Health of Cubesat: Healthy Haha")
-        initial_packet = radio1.receive(timeout=10)
-        print("received nothing")
-        if initial_packet is None:
-            continue
-        print(initial_packet)
-        if initial_packet != b'IRVCB':
-            continue
-        filepath = "THBBlueEarthTest.jpeg"
-        size = os.stat(filepath)[6]
-        
-        with open(filepath, "rb") as image:
-            radio1.send(bytearray([1]) + bytearray(size.to_bytes(4, "little")) + bytearray(image.read(244)))
-            print("sent")
-            packet_count = (size-1)//244+1
-            for packet_index in range(2, packet_count+1):
-                radio1.send(bytearray([1]) + bytearray(packet_index.to_bytes(4, "little")) + \
-                    bytearray(image.read(244)))
-                print("sent")
-        radio1.send("Done")
-        
-        print("Sent image")
-            
-    except Exception as e:
-        print("Error in Main Loop: "+ ''.join(traceback.format_exception(e)))
-'''
-
-
-
-
-
-
-
-MAX_PACKET_SIZE = 250
+# Chip's buffer size: 256 bytes
+# pycubed_rfm9x header size: 4 bytes
+# pycubed_rfm9x CRC16 checksum size: 2 bytes (not sure if this takes away from available bytes)
+# ptp header size: 3 bytes
+MAX_PACKET_SIZE = 256 - 4 - 2 - 3 # 247
+# msgpack apparently adds 2 bytes overhead for bytes payloads
+MAX_PAYLOAD_SIZE = MAX_PACKET_SIZE - 2 # 245
 TEST_IMAGE_PATH = "THBBlueEarthTest.jpeg"
 
-def main():
+async def main():
 	print("Initializing main loop")
 	
 	spi0   = busio.SPI(board.SPI0_SCK,board.SPI0_MOSI,board.SPI0_MISO)
@@ -66,8 +35,8 @@ def main():
 	radio1.enable_crc=True
 	radio1.ack_delay=0.2
 	
-	PTP = ptp.AsyncPacketTransferProtocol(radio1, packet_size=MAX_PACKET_SIZE, timeout=10, log=False)
-	FTP = ftp.FileTransferProtocol(PTP, log=False)
+	PTP = ptp.AsyncPacketTransferProtocol(radio1, packet_size=MAX_PACKET_SIZE, timeout=10, log=True)
+	FTP = ftp.FileTransferProtocol(PTP, chunk_size=MAX_PAYLOAD_SIZE, packet_delay=3, log=True)
 	
 	while True:
 		try:
@@ -88,7 +57,7 @@ def main():
 			radio1.send(packet)
 			
 			print("Sending a picture")
-			FTP.send_file_sync(TEST_IMAGE_PATH)
+			await FTP.send_file(TEST_IMAGE_PATH)
 			
 			print("5-sec cooldown period")
 			time.sleep(5)
@@ -98,4 +67,4 @@ def main():
 		
 
 if __name__ == "__main__":
-	main()
+	asyncio.run(main())

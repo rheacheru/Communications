@@ -88,7 +88,7 @@ async def main():
 	RADIO_FREQ_MHZ = 437.4
 	node = const(0xfb)
 	destination = const(0xfa)
-	MAX_PACKET_SIZE = 250
+	MAX_PACKET_SIZE = 247
 
 	radio = pycubed_rfm9x.RFM9x(board.SPI(), CS, RST, 437.4)
 	radio.spreading_factor = 8
@@ -96,16 +96,16 @@ async def main():
 	radio.destination = destination
 	radio.enable_crc = True
 	
-	pool = attempt_wifi()
+	# pool = attempt_wifi()
 	
 	PTP = AsyncPacketTransferProtocol(radio, packet_size=MAX_PACKET_SIZE, timeout=10, log=False)
-	FTP = FileTransferProtocol(PTP, log=False)
+	FTP = FileTransferProtocol(PTP, chunk_size=MAX_PACKET_SIZE, log=True)
 	
 	# async def send_packet(self, packet_type, payload, sequence_num=2**15 - 1):
 	
 	while True:
 		try:
-			print('Waiting for telemetry ping (handshake 1)')	
+			print('Waiting for telemetry ping (handshake 1)')   
 			
 			packet = radio.receive(timeout=10)
 			if packet is None:
@@ -137,13 +137,17 @@ async def main():
 			
 			# Start listening for image packets
 			while True:
+				print("Listening for image packets")
 				packet_list, missing = await FTP.receive_file_custom()
 				if packet_list is None:
 					print("No image packet received")
 					break
 				print("Image packet received")
-				print(packet_list)
-				print(missing)
+				# print(packet_list)
+				# print(missing)
+				with open("received_test_image.jpeg", "wb") as f:
+					for chunk in packet_list:
+						f.write(chunk)
 			
 			# Request images or return to standby
 			
