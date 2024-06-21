@@ -16,12 +16,21 @@ import traceback
 # from comms import file_receive
 import os
 import asyncio
+import radio_diagnostics
 
 
 from new_comms_protocol.ptp import AsyncPacketTransferProtocol
 from new_comms_protocol.ftp import FileTransferProtocol
 
-
+def check_write_permissions():
+	try:
+		with open("write_permissions_test_file.txt", "w") as f:
+			f.write("test")
+	except OSError:
+		raise OSError("Read-only filesystem. Change boot.py to remount with option 'False' and unplug/replug.")
+	else:
+		print("Write permissions confirmed.")
+		os.remove("write_permissions_test_file.txt")
 
 def attempt_wifi():
 	# TODO: Move wifi pass and id to config
@@ -39,7 +48,7 @@ def attempt_wifi():
 		print("Unable to connect to WiFi: {}".format(e))
 		return None
 	else:
-		return pool    
+		return pool
 		
 def synctime(pool):
 	try:
@@ -79,11 +88,12 @@ def synctime(pool):
 
 
 async def main():
+	print("Irvington CubeSat's Ground Station")
+	
 	CS = digitalio.DigitalInOut(board.D20)
 	CS.switch_to_output(True)
 	RST = digitalio.DigitalInOut(board.D21)
 	RST.switch_to_output(True)
-	print('hello')
 
 	RADIO_FREQ_MHZ = 437.4
 	node = const(0xfb)
@@ -101,13 +111,15 @@ async def main():
 	PTP = AsyncPacketTransferProtocol(radio, packet_size=MAX_PACKET_SIZE, timeout=10, log=False)
 	FTP = FileTransferProtocol(PTP, chunk_size=MAX_PACKET_SIZE, log=True)
 	
-	# async def send_packet(self, packet_type, payload, sequence_num=2**15 - 1):
+	radio_diagnostics.report_diagnostics(radio)
+	
+	check_write_permissions()
 	
 	while True:
 		try:
 			print('Waiting for telemetry ping (handshake 1)')   
 			
-			packet = radio.receive(timeout=10)
+			packet = radio.receive(timeout=30)
 			if packet is None:
 				continue
 			packet = packet.decode("utf-8")
@@ -138,14 +150,18 @@ async def main():
 			# Start listening for image packets
 			while True:
 				print("Listening for image packets")
-				packet_list, missing = await FTP.receive_file_custom()
+				packet_list, missing, image_id = await FTP.receive_file_custom()
 				if packet_list is None:
 					print("No image packet received")
 					break
-				print("Image packet received")
-				# print(packet_list)
-				# print(missing)
-				with open("received_test_image.jpeg", "wb") as f:
+				print(f"Image {image_id} received")
+				if missing.count(1) > 0:
+					print(f"Missing packets: {missing}")
+				else:
+					print("No missing packets")
+				
+				# filename = datetime.now().isoformat().replace(":","-")
+				with open(f"image_{image_id}.jpeg", "wb") as f:
 					for chunk in packet_list:
 						f.write(chunk)
 			
