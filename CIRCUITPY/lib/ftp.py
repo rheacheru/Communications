@@ -57,7 +57,7 @@ class FileTransferProtocol:
                 os.sync()
             return missing
     
-    async def _receive_file(self):
+    async def receive_file_custom(self):
         num_packets, sequence_number = await self.ptp.receive_packet()
         if num_packets is False:
             return None, None
