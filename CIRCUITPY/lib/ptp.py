@@ -19,45 +19,61 @@ class AsyncPacketTransferProtocol:
     def __init__(self, protocol, packet_size=252, timeout=1, log=False):
         self.protocol = protocol
         self.packet_size = packet_size
+        self.max_packet_total_size = 252 # pycubed_rfm9x
+        
         self.timeout = timeout # Modified
         self.log = log
         self.tmp_stream = io.BytesIO()
         self.out_stream = io.BytesIO()
         self.data_packet = 0
         self.cmd_packet = 1
-        self.header_len = 3
+        self.header_len = 6
+        
+        # Constants
+        self.MAX_SIZE = self.max_packet_total_size
+        self.MAX_SEQUENCE_NUM = 2**19-1
+        self.MAX_PAYLOAD_ID = 2**20-1
+    
+    def logger(self, *messages):
+        if self.log:
+            for m in messages:
+                print(m)
 
-    def write_packet_into_out_stream(self, packet_type, payload, sequence_num):
+    def write_packet_into_out_stream(self, packet_type, payload, sequence_num, payload_id):
         self.out_stream.seek(0)
         self.tmp_stream.seek(0)
         if packet_type != self.cmd_packet and packet_type != self.data_packet:
-            print("packet type error")
+            self.logger("packet type error")
             return -1
-        elif sequence_num > 2**15 - 1:
-            print("sequence num error")
+        elif sequence_num > self.MAX_SEQUENCE_NUM:
+            self.logger("sequence num error")
+            return -1
+        elif payload_id > self.MAX_PAYLOAD_ID:
+            self.logger("payload id error")
             return -1
         else:
             msgpack.pack(payload, self.tmp_stream)
             payload_len = self.tmp_stream.tell()
             self.tmp_stream.seek(0)
-            if payload_len > self.packet_size: # Modified
-                print(f"packet too long ({payload_len} bytes, limit is {self.packet_size})")
+            if payload_len > self.packet_size:
+                self.logger(f"packet too long ({payload_len} bytes, limit is {self.packet_size})")
                 return -1
-            header = (packet_type << 23) | (payload_len << 15) | sequence_num
-            if self.log:
-                print(f"header: {header}")
-            if self.log:
-                print(f"packet type: {packet_type}")
-            if self.log:
-                print(f"payload len: {payload_len}")
-            if self.log:
-                print(f"sequence num: {sequence_num}")
-            if self.log:
-                print(f"pycubed sending packet: {self.tmp_stream.getvalue()}")
-            header_arr = bytearray(3)
-            header_arr[0] = (header >> 2 * 8) & 0xFF
-            header_arr[1] = header >> 8 & 0xFF
-            header_arr[2] = header & 0xFF
+            # header = (packet_type << 23) | (payload_len << 15) | sequence_num
+            # Modified header
+            header = (packet_type << 47) | (payload_len << 39) | (sequence_num << 20) | payload_id
+            self.logger(f"header: {header}")
+            self.logger(f"packet type: {packet_type}", f"payload len: {payload_len}")
+            self.logger(f"sequence num: {sequence_num}", f"payload ID: {payload_id}")
+            self.logger(f"pycubed sending packet: {self.tmp_stream.getvalue()}")
+            
+            # Equivalent to header_arr = header.to_bytes(6, "big")
+            header_arr = bytearray(6)
+            header_arr[0] = (header >> 40) & 0xFF
+            header_arr[1] = (header >> 32) & 0xFF
+            header_arr[2] = (header >> 24) & 0xFF
+            header_arr[3] = (header >> 16) & 0xFF
+            header_arr[4] = (header >> 8) & 0xFF
+            header_arr[5] = header & 0xFF
             self.out_stream.write(header_arr)
             self.out_stream.write(self.tmp_stream.read(payload_len))
             self.out_stream.seek(0)
@@ -67,66 +83,62 @@ class AsyncPacketTransferProtocol:
 
     def send_cmd_packet_sync(self, command):
         payload_len = self.write_packet_into_out_stream(
-            self.cmd_packet, command, 2**15-1
+            self.cmd_packet, command, self.MAX_SEQUENCE_NUM, self.MAX_PAYLOAD_ID
         )
         if payload_len == -1:
             return False
         self.out_stream.seek(0)
-        if self.log:
-            print(f"wrote data: {self.out_stream.read(252)}")
+        self.logger(f"wrote data: {self.out_stream.read(self.MAX_SIZE)}")
         self.out_stream.seek(0)
-        success = self.protocol.send_with_ack(self.out_stream.read(252))
-        if self.log:
-            print("waiting for ack...")
+        success = self.protocol.send_with_ack(self.out_stream.read(self.MAX_SIZE))
+        self.logger("waiting for ack...")
         if not success:
-            if self.log:
-                print("did not receive ack")
+            self.logger("did not receive ack")
             return False
-        if self.log:
-            print("received ack")
+        self.logger("received ack")
 
-    def send_data_packet_sync(self, payload, sequence_num=2**15 - 1):
+    def send_data_packet_sync(self, payload, sequence_num=None, payload_id=None):
+        if sequence_num is None:
+            sequence_num = self.MAX_SEQUENCE_NUM
+        if payload_id is None:
+            payload_id = self.MAX_PAYLOAD_ID
         payload_len = self.write_packet_into_out_stream(
-            self.data_packet, payload, sequence_num
+            self.data_packet, payload, sequence_num, payload_id
         )
         if payload_len == -1:
             return False
         self.out_stream.seek(0)
-        if self.log:
-            print(f"wrote data: {self.out_stream.read(252)}")
+        self.logger(f"wrote data: {self.out_stream.read(self.MAX_SIZE)}")
         self.out_stream.seek(0)
-        self.protocol.send(self.out_stream.read(252))
+        self.protocol.send(self.out_stream.read(self.MAX_SIZE))
         self.out_stream.seek(0)
         return True
 
-    async def send_packet(self, packet_type, payload, sequence_num=2**15 - 1):
-        print("Called with payload:")
-        print(payload)
+    async def send_packet(self, packet_type, payload, sequence_num=None, payload_id=None):
+        if sequence_num is None:
+            sequence_num = self.MAX_SEQUENCE_NUM
+        if payload_id is None:
+            payload_id = self.MAX_PAYLOAD_ID
         payload_len = self.write_packet_into_out_stream(
-            packet_type, payload, sequence_num
+            packet_type, payload, sequence_num, payload_id
         )
         if payload_len == -1:
             return False
         if packet_type == self.cmd_packet:
             self.out_stream.seek(0)
-            if self.log:
-                print(f"wrote data: {self.out_stream.read(252)}")
+            self.logger(f"wrote data: {self.out_stream.read(self.MAX_SIZE)}")
             self.out_stream.seek(0)
-            success = await self.protocol.send_with_ack(self.out_stream.read(252))
-            if self.log:
-                print("waiting for ack...")
+            success = await self.protocol.send_with_ack(self.out_stream.read(self.MAX_SIZE))
+            self.logger("waiting for ack...")
             if not success:
-                if self.log:
-                    print("did not receive ack")
+                self.logger("did not receive ack")
                 return False
-            if self.log:
-                print("received ack")
+            self.logger("received ack")
         else:
             self.out_stream.seek(0)
-            if self.log:
-                print(f"wrote data: {self.out_stream.read(252)}")
+            self.logger(f"wrote data: {self.out_stream.read(self.MAX_SIZE)}")
             self.out_stream.seek(0)
-            self.protocol.send(self.out_stream.read(252))
+            self.protocol.send(self.out_stream.read(self.MAX_SIZE))
         self.out_stream.seek(0)
         return True
     
@@ -134,47 +146,43 @@ class AsyncPacketTransferProtocol:
     async def receive_packet(self, with_ack=False):
         packet = self.protocol.receive(timeout=self.timeout, with_ack=with_ack) # Modified
         if packet is None:
-            return False, False
+            return False, False, False
         
-        header = int.from_bytes(packet[0:3], "big")
-        packet_type = header >> 23
-        payload_len = (header >> 15) & (2**8 - 1)
-        sequence_num = header & (2**15 - 1)
-        if self.log:
-            print(f"header: {header}")
-            print(f"packet type: {packet_type}")
-            print(f"payload len: {payload_len}")
-            print(f"sequence num: {sequence_num}")
+        header = int.from_bytes(packet[0:6], "big")
+        packet_type = header >> 47
+        payload_len = (header >> 39) & (2**8 - 1)
+        sequence_num = (header >> 20) & (2**19 - 1)
+        payload_id = header & (2**20 - 1)
+        self.logger(f"header: {header}")
+        self.logger(f"packet type: {packet_type}", f"payload len: {payload_len}")
+        self.logger(f"sequence num: {sequence_num}", f"payload ID: {payload_id}")
         self.tmp_stream = io.BytesIO()
-        if self.log:
-            print(f"tmp stream before rw: {self.tmp_stream.getvalue()}")
+        self.logger(f"tmp stream before rw: {self.tmp_stream.getvalue()}")
         self.tmp_stream.seek(0)
-        self.tmp_stream.write(packet[3:]) # Modified
-        if self.log:
-            print(f"tmp stream before write: {self.tmp_stream.getvalue()}")
-            self.tmp_stream.seek(0)
-            print(f"payload_packed: {self.tmp_stream.read(payload_len)}")
+        self.tmp_stream.write(packet[6:]) # Modified
+        self.logger(f"tmp stream before write: {self.tmp_stream.getvalue()}")
+        self.tmp_stream.seek(0)
+        self.logger(f"payload_packed: {self.tmp_stream.read(payload_len)}")
         self.tmp_stream.seek(0)
         try:
             payload = msgpack.unpack(self.tmp_stream)  # TODO make this the same?
         except TypeError:
             print(f"Unexpected structure: {self.tmp_stream.getvalue()}")
-            return False, False
+            return False, False, False
         except ValueError:
             print(f"Failed to decode: {self.tmp_stream.getvalue()}")
-            return False, False
+            return False, False, False
         except Exception as e:
             print(f"Unknown exception: {self.tmp_stream.getvalue()} {e}")
-            return False, False
+            return False, False, False
         else:
             if packet_type == self.cmd_packet:
                 print("pycubed sending ACK")
                 self.protocol.send(b"ACK")
             self.tmp_stream = io.BytesIO()
             self.tmp_stream.seek(0)
-            if self.log:
-                print(f"payload: {payload}")
-            return payload, sequence_num
+            self.logger(f"payload: {payload}")
+            return payload, sequence_num, payload_id
         finally:
             self.tmp_stream = io.BytesIO()
             self.tmp_stream.seek(0)
