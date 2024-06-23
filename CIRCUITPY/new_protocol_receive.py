@@ -2,15 +2,15 @@
 import pycubed_rfm9x
 import board
 import digitalio
-import busio
+# import busio
 import time
 import wifi
 from secrets import secrets
 import socketpool
 import adafruit_requests
 import rtc
-import adafruit_minimqtt.adafruit_minimqtt as MQTT
-import ssl
+# import adafruit_minimqtt.adafruit_minimqtt as MQTT
+# import ssl
 from adafruit_datetime import datetime
 import traceback
 # from comms import file_receive
@@ -85,7 +85,13 @@ def synctime(pool):
 	except Exception as e:
 		print('[WARNING]', e)
 
-
+def verify_packet(packet, desired_type):
+	if packet.categorize() == desired_type:
+		print(f"Packet is of desired type {desired_type}")
+		return True
+	else:
+		print(f"Packet is of undesired type {packet.categorize()}, not {desired_type}")
+		return False
 
 async def main():
 	print("Irvington CubeSat's Ground Station")
@@ -109,7 +115,7 @@ async def main():
 	# pool = attempt_wifi()
 	
 	PTP = AsyncPacketTransferProtocol(radio, packet_size=MAX_PACKET_SIZE, timeout=10, log=False)
-	FTP = FileTransferProtocol(PTP, chunk_size=MAX_PACKET_SIZE, log=True)
+	FTP = FileTransferProtocol(PTP, chunk_size=MAX_PACKET_SIZE, log=False)
 	
 	radio_diagnostics.report_diagnostics(radio)
 	
@@ -117,44 +123,37 @@ async def main():
 	
 	while True:
 		try:
-			print('Waiting for telemetry ping (handshake 1)')   
+			print("Waiting for telemetry ping (handshake 1)")   
+			packet = await PTP.receive_packet()
+			if not verify_packet(packet, "handshake1"):
+				continue
 			
-			packet = radio.receive(timeout=30)
-			if packet is None:
-				continue
-			packet = packet.decode("utf-8")
-			if packet != "#IRVCB":
-				continue
 			print("Telemetry ping (handshake 1) received")
+			packet = PTP.Packet.make_handshake2()
+			await PTP.send_packet(packet)
+			print("Handshake 2 sent")
 			
-			radio.send(b"#IRVCBH2")
-			print("Handshake 2 sent, waiting for handshake 3")
+			print("Waiting for handshake 3")
+			packet = await PTP.receive_packet()
+			if not verify_packet(packet, "handshake3"):
+				continue
 			
-			# filepath =f'received_telemetry/{datetime.now().isoformat()}.txt'.replace(":", "-")
-			# with open(filepath, 'w') as f:
-			#     f.write(packet)
-			#     print(f"Telemetry packet written to {filepath}")
-			# radio.send("IRVCB")
-
-			packet = radio.receive(timeout=10)
-			if packet is None:
-				continue
-			identifier = packet[0:8].decode("utf-8")
-			if identifier != "#IRVCBH3":
-				continue
 			print("Handshake 3 received")
-			
-			image_count = int.from_bytes(packet[8:12], "little")
+			image_count = packet.payload[1]
 			print(f"CubeSat has taken {image_count} images so far")
-			
+
 			# Start listening for image packets
 			while True:
+				# to do: request new images
 				print("Listening for image packets")
+				start_time = time.monotonic()
 				packet_list, missing, image_id = await FTP.receive_file_custom()
+				# to do: if image partially received, request again
+				end_time = time.monotonic()
 				if packet_list is None:
 					print("No image packet received")
 					break
-				print(f"Image {image_id} received")
+				print(f"Image {image_id} received, taking {end_time - start_time} seconds")
 				if missing.count(1) > 0:
 					print(f"Missing packets: {missing}")
 				else:
@@ -173,3 +172,4 @@ async def main():
 
 if __name__ == "__main__":
 	asyncio.run(main())
+

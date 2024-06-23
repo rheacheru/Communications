@@ -81,21 +81,31 @@ class FileTransferProtocol:
             
     
     async def receive_file_custom(self):
-        num_packets, sequence_number, payload_id = await self.ptp.receive_packet()
-        if num_packets is False:
+        # to do: store individual packets and assemble files when complete
+        packet = await self.ptp.receive_packet()
+        if packet.categorize() != "file_len":
+            print(f"Packet of type {packet.categorize()} (not file_len) received")
             return None, None, None
-        num_packets = abs(num_packets)
+        file_id = packet.payload_id
+        num_packets = abs(packet.payload)
         if self.log:
-            print(f"expecting to receive {num_packets} packets")
+            print(f"File {file_id} contains {num_packets} packets")
         packet_list = [None for i in range(num_packets)]
         missing = [1 for i in range(num_packets)]
         for packet_num in range(num_packets):
-            chunk, packet_num_recvc, packet_payload_id = await self.ptp.receive_packet()
+            packet = await self.ptp.receive_packet()
+            if packet.categorize() != "file_data":
+                print(f"Packet of type {packet.categorize()} (not file_data) received")
+                continue
+            chunk = packet.payload
+            packet_num_recvc = packet.sequence_num
+            packet_payload_id = packet.payload_id
+            
             packet_list[packet_num_recvc] = chunk
             missing[packet_num_recvc] = 0
             if self.log:
                 print(f"{missing.count(0)} packets of {num_packets} received")
-        return packet_list, missing, payload_id
+        return packet_list, missing, packet_payload_id
     
     async def receive_partial_file_custom(self, missing):
         # Update missing with incoming packets
@@ -159,23 +169,27 @@ class FileTransferProtocol:
             # send the number of packets for the client
             print("Sending packet count and file ID")
             packet_count = math.ceil(filesize / self.chunk_size)
-            await self.ptp.send_packet(
-                self.ptp.data_packet,
-                 - packet_count,
-                payload_id=file_id
-            )
+            packet = self.ptp.Packet.make_file_len(file_id, packet_count)
+            await self.ptp.send_packet(packet)
+            # await self.ptp.send_packet(
+                # self.ptp.data_packet,
+                 # - packet_count,
+                # payload_id=file_id
+            # )
 
             # send all the chunks
             for chunk, packet_num in self._read_chunks(f, self.chunk_size):
                 if self.packet_delay > 0:
                     await asyncio.sleep(self.packet_delay)
                 print(f"Sending packet {packet_num+1}")
-                success = await self.ptp.send_packet(
-                    self.ptp.data_packet,
-                    chunk,
-                    sequence_num=packet_num,
-                    payload_id=file_id
-                )
+                # success = await self.ptp.send_packet(
+                    # self.ptp.data_packet,
+                    # chunk,
+                    # sequence_num=packet_num,
+                    # payload_id=file_id
+                # )
+                packet = self.ptp.Packet.make_file_data(packet_num, file_id, chunk)
+                success = await self.ptp.send_packet(packet)
                 if not success:
                     print(f"Failed to send packet {packet_num}")
                 else:

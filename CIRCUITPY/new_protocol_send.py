@@ -37,27 +37,33 @@ async def main():
 	radio1.ack_delay=0.2
 	
 	PTP = ptp.AsyncPacketTransferProtocol(radio1, packet_size=MAX_PACKET_SIZE, timeout=10, log=False)
-	FTP = ftp.FileTransferProtocol(PTP, chunk_size=MAX_PAYLOAD_SIZE, packet_delay=0, log=True)
+	FTP = ftp.FileTransferProtocol(PTP, chunk_size=MAX_PAYLOAD_SIZE, packet_delay=0, log=False)
 	
 	radio_diagnostics.report_diagnostics(radio1)
 	
 	while True:
 		try:
 			print("Sending telemetry ping (handshake 1) and waiting for handshake 2")
-			radio1.send(b"#IRVCB")
-			packet = radio1.receive(timeout=10)
-			if packet is None:
-				continue
-			packet = packet.decode("utf-8")
-			if packet != "#IRVCBH2":
+			# radio1.send(b"#IRVCB")
+			packet = PTP.Packet.make_handshake1()
+			print(packet.payload)
+			await PTP.send_packet(packet)
+			print("sent")
+			packet = await PTP.receive_packet()
+			if packet.categorize() != "handshake2":
+				print(f"Packet of type {packet.categorize()} (not handshake2) received")
 				continue
 				
 			print("Handshake 2 received, sending handshake 3")
-			header = bytearray("#IRVCBH3", "utf-8")
+			
+			# header = bytearray("#IRVCBH3", "utf-8")
 			image_count = 420
-			image_count_ba = bytearray(image_count.to_bytes(4, "little"))
-			packet = header + image_count_ba
-			radio1.send(packet)
+			# image_count_ba = bytearray(image_count.to_bytes(4, "little"))
+			# packet = header + image_count_ba
+			
+			packet = PTP.Packet.make_handshake3(image_count)
+			# radio1.send(packet)
+			await PTP.send_packet(packet)
 			
 			print("Sending a picture")
 			await FTP.send_file(TEST_IMAGE_PATH, file_id=69)
