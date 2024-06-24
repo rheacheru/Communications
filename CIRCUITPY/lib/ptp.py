@@ -12,6 +12,17 @@ import io
 import msgpack
 from icpacket import Packet
 
+import adafruit_ticks
+def timed_function(f, *args, **kwargs):
+    myname = str(f)# .split(' ')[1]
+    def new_func(*args, **kwargs):
+        t = adafruit_ticks.ticks_ms()
+        result = f(*args, **kwargs)
+        delta = adafruit_ticks.ticks_ms() - t
+        print('Function {} Time = {:6.3f}ms'.format(myname, delta))
+        return result
+    return new_func
+
 class AsyncPacketTransferProtocol:
     """A simple transfer protocol for commands and data"""
 
@@ -22,9 +33,9 @@ class AsyncPacketTransferProtocol:
         
         self.timeout = timeout # Modified
         self.log = log
-        self.tmp_stream = io.BytesIO()
-        self.out_stream = io.BytesIO()
         self.MAX_SIZE = self.max_packet_total_size
+        self.tmp_stream = io.BytesIO(self.MAX_SIZE)
+        self.out_stream = io.BytesIO(self.MAX_SIZE)
     
     # Constants
     data_packet = Packet.data_packet
@@ -38,7 +49,7 @@ class AsyncPacketTransferProtocol:
         if self.log:
             for m in messages:
                 print(m)
-
+    
     def write_packet_into_out_stream(self, packet_type, payload, sequence_num, payload_id):
         self.out_stream.seek(0)
         self.tmp_stream.seek(0)
@@ -77,7 +88,7 @@ class AsyncPacketTransferProtocol:
             self.out_stream.write(header_arr)
             self.out_stream.write(self.tmp_stream.read(payload_len))
             self.out_stream.seek(0)
-            self.tmp_stream = io.BytesIO()  # TODO fix this.
+            self.tmp_stream = io.BytesIO(self.MAX_SIZE)  # TODO fix this.
             self.tmp_stream.seek(0)
             return payload_len
 
@@ -143,15 +154,65 @@ class AsyncPacketTransferProtocol:
             # self.logger(f"wrote data: {self.out_stream.read(self.MAX_SIZE)}")
             # self.out_stream.seek(0)
             # self.protocol.send(self.out_stream.read(self.MAX_SIZE))
-		
+        
         # to do: acknowledge the right packets
         self.out_stream.seek(0)
-        self.logger(f"wrote data: {self.out_stream.read(self.MAX_SIZE)}")
+        if self.log: print(f"wrote data: {self.out_stream.read(self.MAX_SIZE)}")
         self.out_stream.seek(0)
-        self.protocol.send(self.out_stream.read(self.MAX_SIZE))
+        raw_payload = self.out_stream.read(self.MAX_SIZE)
+        print(len(raw_payload))
+        start = adafruit_ticks.ticks_ms()
+        self.protocol.send(raw_payload)
+        print(adafruit_ticks.ticks_ms()-start, "ms taken to send")
         self.out_stream.seek(0)
         return True
     
+    def send_packet_sync(self, packet):
+        packet_type = packet.packet_type
+        sequence_num = packet.sequence_num
+        if sequence_num is None:
+            sequence_num = self.MAX_SEQUENCE_NUM
+        payload_id = packet.payload_id
+        if payload_id is None:
+            payload_id = self.MAX_PAYLOAD_ID
+        payload = packet.payload
+        payload_len = self.write_packet_into_out_stream(
+            packet_type, payload, sequence_num, payload_id
+        )
+        if payload_len == -1:
+            return False
+        
+        # to do: acknowledge the right packets
+        self.out_stream.seek(0)
+        if self.log: print(f"wrote data: {self.out_stream.read(self.MAX_SIZE)}")
+        self.out_stream.seek(0)
+        raw_payload = self.out_stream.read(self.MAX_SIZE)
+        print(len(raw_payload))
+        start = adafruit_ticks.ticks_ms()
+        self.protocol.send(raw_payload)
+        print(adafruit_ticks.ticks_ms()-start, "ms taken to send")
+        self.out_stream.seek(0)
+        return True
+    
+    def send_raw_sync(self, data):
+        packet_type = 0
+        sequence_num = 0
+        payload_id = 0
+        payload = data
+        payload_len = self.write_packet_into_out_stream(
+            packet_type, payload, sequence_num, payload_id
+        )
+        if payload_len == -1:
+            return False
+        
+        self.out_stream.seek(0)
+        # raw_payload = self.out_stream.read(252)
+        raw_payload = b'qwertyuiopasdfghjklzxcvbnm'*9 + b'8'*18 #exactly len 252
+        start = adafruit_ticks.ticks_ms()
+        self.protocol.send(raw_payload)
+        print(adafruit_ticks.ticks_ms()-start, "ms taken to send")
+        self.out_stream.seek(0)
+        return True
     
     async def receive_packet(self, with_ack=False):
         packet = self.protocol.receive(timeout=self.timeout, with_ack=with_ack)
@@ -166,7 +227,7 @@ class AsyncPacketTransferProtocol:
         self.logger(f"header: {header}")
         self.logger(f"packet type: {packet_type}", f"payload len: {payload_len}")
         self.logger(f"sequence num: {sequence_num}", f"payload ID: {payload_id}")
-        self.tmp_stream = io.BytesIO()
+        self.tmp_stream = io.BytesIO(self.MAX_SIZE)
         self.logger(f"tmp stream before rw: {self.tmp_stream.getvalue()}")
         self.tmp_stream.seek(0)
         self.tmp_stream.write(packet[6:]) # Modified
@@ -189,12 +250,12 @@ class AsyncPacketTransferProtocol:
             # if packet_type == self.cmd_packet:
             #   print("pycubed sending ACK")
             #   self.protocol.send(b"ACK")
-            self.tmp_stream = io.BytesIO()
+            self.tmp_stream = io.BytesIO(self.MAX_SIZE)
             self.tmp_stream.seek(0)
             self.logger(f"payload: {payload}")
             return Packet(packet_type, sequence_num, payload_id, payload)
         finally:
-            self.tmp_stream = io.BytesIO()
+            self.tmp_stream = io.BytesIO(self.MAX_SIZE)
             self.tmp_stream.seek(0)
     
     def crc32(self, packet_type, payload):

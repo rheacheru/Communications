@@ -13,19 +13,20 @@ from icpacket import Packet
 from new_comms_protocol.ptp import AsyncPacketTransferProtocol as APTP
 from new_comms_protocol.ftp import FileTransferProtocol as FTP
 
-# Chip's buffer size: 256 bytes
-# pycubed_rfm9x header size: 4 bytes
-# pycubed_rfm9x CRC16 checksum size: 2 bytes (not sure if this takes away from available bytes)
-# ptp header size: 6 bytes
-MAX_PACKET_SIZE = 256 - 4 - 2 - 6 # 244
-# msgpack apparently adds 2 bytes overhead for bytes payloads
-MAX_PAYLOAD_SIZE = MAX_PACKET_SIZE - 2 # 242
-TEST_IMAGE_PATH = "THBBlueEarthTest.jpeg"
-
 async def main():
 	print("Irvington CubeSat's Test Satellite Board")
 	
-	spi0   = busio.SPI(board.SPI0_SCK,board.SPI0_MOSI,board.SPI0_MISO)
+	# Constants
+	# Chip's buffer size: 256 bytes
+	# pycubed_rfm9x header size: 4 bytes
+	# pycubed_rfm9x CRC16 checksum size: 2 bytes (DOES NOT take away from available bytes)
+	# ptp header size: 6 bytes
+	MAX_PAYLOAD_SIZE = 256 - 4 - 6 # 246
+	# msgpack adds 2 bytes overhead for bytes payloads
+	CHUNK_SIZE = MAX_PAYLOAD_SIZE - 2 # 244
+	TEST_IMAGE_PATH = "THBBlueEarthTest.jpeg"
+	
+	spi0 = busio.SPI(board.SPI0_SCK,board.SPI0_MOSI,board.SPI0_MISO)
 	_rf_cs1 = digitalio.DigitalInOut(board.SPI0_CS0)
 	_rf_cs1.switch_to_output(value=True)
 	_rf_rst1 = digitalio.DigitalInOut(board.RF1_RST)
@@ -38,10 +39,39 @@ async def main():
 	radio1.enable_crc=True
 	radio1.ack_delay=0.2
 	
-	ptp = APTP(radio1, packet_size=MAX_PACKET_SIZE, timeout=10, log=False)
-	ftp = FTP(ptp, chunk_size=MAX_PAYLOAD_SIZE, packet_delay=0, log=False)
+	# Code from pysquared cubesat code - effect unknown
+	# radio1_DIO0 = digitalio.DigitalInOut(board.RF1_IO0)
+	# radio1_DIO0.switch_to_input()
+	# radio1.DIO0 = radio1_DIO0
+	# radio1.max_output = True
+	
+	ptp = APTP(radio1, packet_size=MAX_PAYLOAD_SIZE, timeout=10, log=False)
+	ftp = FTP(ptp, chunk_size=CHUNK_SIZE, packet_delay=0, log=False)
 	
 	radio_diagnostics.report_diagnostics(radio1)
+	
+	if input("Debug? y/n ").strip().lower() == 'y':
+		start_time = time.monotonic()
+		for _ in range(3):
+			radio1.send(b's'*252)
+		end_time = time.monotonic()
+		print(f"Sending raw took {end_time-start_time} sec")
+		# start_time = time.monotonic()
+		# await ftp.send_file(TEST_IMAGE_PATH, file_id=69)
+		# end_time = time.monotonic()
+		# print(f"Sending with ftp took {end_time-start_time} sec")
+		start_time = time.monotonic()
+		for _ in range(3):
+			ptp.send_packet_sync(Packet(Packet.cmd_packet, None, None, b's'*242))
+		end_time = time.monotonic()
+		print(f"Sending with ptp took {end_time-start_time} sec")
+		start_time = time.monotonic()
+		for _ in range(3):
+			ptp.send_raw_sync(b's'*242)
+		end_time = time.monotonic()
+		print(f"Sending with ptp took {end_time-start_time} sec")
+		
+		input()
 	
 	while True:
 		try:
@@ -72,7 +102,6 @@ async def main():
 		
 		except Exception as e:
 			print("Error in Main Loop: "+ ''.join(traceback.format_exception(e)))
-		
 
 if __name__ == "__main__":
 	asyncio.run(main())
