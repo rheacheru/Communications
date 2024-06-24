@@ -22,6 +22,8 @@ async def main():
 	# pycubed_rfm9x CRC16 checksum size: 2 bytes (DOES NOT take away from available bytes)
 	# ptp header size: 6 bytes
 	MAX_PAYLOAD_SIZE = 256 - 4 - 6 # 246
+	# max length packets are bugged
+	MAX_PAYLOAD_SIZE = MAX_PAYLOAD_SIZE - 1
 	# msgpack adds 2 bytes overhead for bytes payloads
 	CHUNK_SIZE = MAX_PAYLOAD_SIZE - 2 # 244
 	TEST_IMAGE_PATH = "THBBlueEarthTest.jpeg"
@@ -45,34 +47,16 @@ async def main():
 	# radio1.DIO0 = radio1_DIO0
 	# radio1.max_output = True
 	
-	ptp = APTP(radio1, packet_size=MAX_PAYLOAD_SIZE, timeout=10, log=False)
+	ptp = APTP(radio1, packet_size=MAX_PAYLOAD_SIZE, timeout=10, log=False, enable_padding=False)  # padding is an optimization
 	ftp = FTP(ptp, chunk_size=CHUNK_SIZE, packet_delay=0, log=False)
 	
 	radio_diagnostics.report_diagnostics(radio1)
-	
-	if input("Debug? y/n ").strip().lower() == 'y':
-		start_time = time.monotonic()
-		for _ in range(3):
-			radio1.send(b's'*252)
-		end_time = time.monotonic()
-		print(f"Sending raw took {end_time-start_time} sec")
-		# start_time = time.monotonic()
-		# await ftp.send_file(TEST_IMAGE_PATH, file_id=69)
-		# end_time = time.monotonic()
-		# print(f"Sending with ftp took {end_time-start_time} sec")
-		start_time = time.monotonic()
-		for _ in range(3):
-			ptp.send_packet_sync(Packet(Packet.cmd_packet, None, None, b's'*242))
-		end_time = time.monotonic()
-		print(f"Sending with ptp took {end_time-start_time} sec")
-		start_time = time.monotonic()
-		for _ in range(3):
-			ptp.send_raw_sync(b's'*242)
-		end_time = time.monotonic()
-		print(f"Sending with ptp took {end_time-start_time} sec")
-		
-		input()
-	
+	# st = time.monotonic()
+	# radio1.send(b'1'*251)
+	# print(time.monotonic()-st)
+	# st = time.monotonic()
+	# radio1.send(b'1'*252)
+	# print(time.monotonic()-st)
 	while True:
 		try:
 			print("Sending telemetry ping (handshake 1) and waiting for handshake 2")
@@ -85,13 +69,8 @@ async def main():
 				
 			print("Handshake 2 received, sending handshake 3")
 			
-			# header = bytearray("#IRVCBH3", "utf-8")
 			image_count = 420
-			# image_count_ba = bytearray(image_count.to_bytes(4, "little"))
-			# packet = header + image_count_ba
-			
 			packet = Packet.make_handshake3(image_count)
-			# radio1.send(packet)
 			await ptp.send_packet(packet)
 			
 			print("Sending a picture")

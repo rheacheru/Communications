@@ -98,6 +98,17 @@ def verify_packet(packet, desired_type):
 async def main():
 	print("Irvington CubeSat's Ground Station")
 	
+	# Constants
+	# Chip's buffer size: 256 bytes
+	# pycubed_rfm9x header size: 4 bytes
+	# pycubed_rfm9x CRC16 checksum size: 2 bytes (DOES NOT take away from available bytes)
+	# ptp header size: 6 bytes
+	MAX_PAYLOAD_SIZE = 256 - 4 - 6 # 246
+	# max length packets are bugged
+	MAX_PAYLOAD_SIZE = MAX_PAYLOAD_SIZE - 1
+	# msgpack adds 2 bytes overhead for bytes payloads
+	CHUNK_SIZE = MAX_PAYLOAD_SIZE - 2 # 244
+	
 	CS = digitalio.DigitalInOut(board.D20)
 	CS.switch_to_output(True)
 	RST = digitalio.DigitalInOut(board.D21)
@@ -106,9 +117,8 @@ async def main():
 	RADIO_FREQ_MHZ = 437.4
 	node = const(0xfb)
 	destination = const(0xfa)
-	MAX_PACKET_SIZE = 247
 
-	radio = pycubed_rfm9x.RFM9x(board.SPI(), CS, RST, 437.4)
+	radio = pycubed_rfm9x.RFM9x(board.SPI(), CS, RST, RADIO_FREQ_MHZ)
 	radio.spreading_factor = 8
 	radio.node = node
 	radio.destination = destination
@@ -116,8 +126,8 @@ async def main():
 	
 	# pool = attempt_wifi()
 	
-	ptp = APTP(radio, packet_size=MAX_PACKET_SIZE, timeout=10, log=False)
-	ftp = FTP(ptp, chunk_size=MAX_PACKET_SIZE, log=False)
+	ptp = APTP(radio, packet_size=MAX_PAYLOAD_SIZE, timeout=10, log=False, enable_padding=False)
+	ftp = FTP(ptp, chunk_size=CHUNK_SIZE, log=False)
 	
 	radio_diagnostics.report_diagnostics(radio)
 	
