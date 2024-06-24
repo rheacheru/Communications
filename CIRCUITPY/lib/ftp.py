@@ -16,6 +16,7 @@ import os
 import math
 import time 
 import asyncio
+from icpacket import Packet
 
 class FileTransferProtocol:
 
@@ -169,7 +170,7 @@ class FileTransferProtocol:
             # send the number of packets for the client
             print("Sending packet count and file ID")
             packet_count = math.ceil(filesize / self.chunk_size)
-            packet = self.ptp.Packet.make_file_len(file_id, packet_count)
+            packet = Packet.make_file_len(file_id, packet_count)
             await self.ptp.send_packet(packet)
             # await self.ptp.send_packet(
                 # self.ptp.data_packet,
@@ -188,7 +189,7 @@ class FileTransferProtocol:
                     # sequence_num=packet_num,
                     # payload_id=file_id
                 # )
-                packet = self.ptp.Packet.make_file_data(packet_num, file_id, chunk)
+                packet = Packet.make_file_data(packet_num, file_id, chunk)
                 success = await self.ptp.send_packet(packet)
                 if not success:
                     print(f"Failed to send packet {packet_num}")

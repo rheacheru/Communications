@@ -16,11 +16,11 @@ import traceback
 # from comms import file_receive
 import os
 import asyncio
+
 import radio_diagnostics
-
-
-from new_comms_protocol.ptp import AsyncPacketTransferProtocol
-from new_comms_protocol.ftp import FileTransferProtocol
+from icpacket import Packet
+from new_comms_protocol.ptp import AsyncPacketTransferProtocol as APTP
+from new_comms_protocol.ftp import FileTransferProtocol as FTP
 
 def check_write_permissions():
 	try:
@@ -86,11 +86,13 @@ def synctime(pool):
 		print('[WARNING]', e)
 
 def verify_packet(packet, desired_type):
+	# Verify that the packet has the desired type
+	assert desired_type in ("handshake1", "handshake2", "handshake3", "file_len", "file_data", "none")
 	if packet.categorize() == desired_type:
-		print(f"Packet is of desired type {desired_type}")
+		# print(f"Packet is of desired type {desired_type}")
 		return True
 	else:
-		print(f"Packet is of undesired type {packet.categorize()}, not {desired_type}")
+		# print(f"Packet is of undesired type {packet.categorize()}, not {desired_type}")
 		return False
 
 async def main():
@@ -114,8 +116,8 @@ async def main():
 	
 	# pool = attempt_wifi()
 	
-	PTP = AsyncPacketTransferProtocol(radio, packet_size=MAX_PACKET_SIZE, timeout=10, log=False)
-	FTP = FileTransferProtocol(PTP, chunk_size=MAX_PACKET_SIZE, log=False)
+	ptp = APTP(radio, packet_size=MAX_PACKET_SIZE, timeout=10, log=False)
+	ftp = FTP(ptp, chunk_size=MAX_PACKET_SIZE, log=False)
 	
 	radio_diagnostics.report_diagnostics(radio)
 	
@@ -124,17 +126,17 @@ async def main():
 	while True:
 		try:
 			print("Waiting for telemetry ping (handshake 1)")   
-			packet = await PTP.receive_packet()
+			packet = await ptp.receive_packet()
 			if not verify_packet(packet, "handshake1"):
 				continue
 			
 			print("Telemetry ping (handshake 1) received")
-			packet = PTP.Packet.make_handshake2()
-			await PTP.send_packet(packet)
+			packet = Packet.make_handshake2()
+			await ptp.send_packet(packet)
 			print("Handshake 2 sent")
 			
 			print("Waiting for handshake 3")
-			packet = await PTP.receive_packet()
+			packet = await ptp.receive_packet()
 			if not verify_packet(packet, "handshake3"):
 				continue
 			
@@ -147,7 +149,7 @@ async def main():
 				# to do: request new images
 				print("Listening for image packets")
 				start_time = time.monotonic()
-				packet_list, missing, image_id = await FTP.receive_file_custom()
+				packet_list, missing, image_id = await ftp.receive_file_custom()
 				# to do: if image partially received, request again
 				end_time = time.monotonic()
 				if packet_list is None:

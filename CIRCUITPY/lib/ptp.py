@@ -9,9 +9,8 @@ Modified for pycubed_rfm9x
 """
 import binascii
 import io
-
 import msgpack
-
+from icpacket import Packet
 
 class AsyncPacketTransferProtocol:
     """A simple transfer protocol for commands and data"""
@@ -28,97 +27,12 @@ class AsyncPacketTransferProtocol:
         self.MAX_SIZE = self.max_packet_total_size
     
     # Constants
-    data_packet = 0
-    cmd_packet = 1
-    header_len = 6 
+    data_packet = Packet.data_packet
+    cmd_packet = Packet.cmd_packet
     
+    header_len = 6
     MAX_SEQUENCE_NUM = 2**19-1
     MAX_PAYLOAD_ID = 2**20-1
-    
-    class Packet:
-        '''
-        Our custom packet class.
-        Details of each packet categorization are below.
-        
-        Category     Type   Payload
-        handshake1   cmd    ["#IRVCB", -1]
-        handshake2   cmd    ["#IRVCBH2", -1]
-        handshake3   cmd    ["#IRVCBH3", image_count]
-        file_len     cmd    packet_count 
-        file_data    data   chunk_data
-        '''
-        def __init__(self, packet_type, sequence_num, payload_id, payload):
-            self.packet_type = packet_type
-            self.sequence_num = sequence_num
-            self.payload_id = payload_id
-            self.payload = payload
-            self.data_packet = AsyncPacketTransferProtocol.data_packet
-            self.cmd_packet = AsyncPacketTransferProtocol.cmd_packet
-            self.MAX_SEQUENCE_NUM = AsyncPacketTransferProtocol.MAX_SEQUENCE_NUM
-            self.MAX_PAYLOAD_ID = AsyncPacketTransferProtocol.MAX_PAYLOAD_ID
-
-        def categorize(self):
-            try:
-                if self.packet_type is None:
-                    return "none"
-                if self.packet_type == self.cmd_packet:
-                    if isinstance(self.payload, list) and len(self.payload) > 0:
-                        if self.payload[0] == "#IRVCB":
-                            return "handshake1"
-                        elif self.payload[0] == "#IRVCBH2":
-                            return "handshake2"
-                        elif self.payload[0] == "#IRVCBH3":
-                            return "handshake3"
-                    return "file_len"
-                else:
-                    return "file_data"
-            except Exception as e:
-                print("Error categorizing packet:", e)
-
-        @staticmethod
-        def make_handshake1():
-            return AsyncPacketTransferProtocol.Packet(
-                AsyncPacketTransferProtocol.cmd_packet,
-                AsyncPacketTransferProtocol.MAX_SEQUENCE_NUM,
-                AsyncPacketTransferProtocol.MAX_PAYLOAD_ID,
-                ["#IRVCB", -1]
-            )
-        
-        @staticmethod
-        def make_handshake2():
-            return AsyncPacketTransferProtocol.Packet(
-                AsyncPacketTransferProtocol.cmd_packet,
-                AsyncPacketTransferProtocol.MAX_SEQUENCE_NUM,
-                AsyncPacketTransferProtocol.MAX_PAYLOAD_ID,
-                ["#IRVCBH2", -1]
-            )
-        
-        @staticmethod
-        def make_handshake3(image_count):
-            return AsyncPacketTransferProtocol.Packet(
-                AsyncPacketTransferProtocol.cmd_packet,
-                AsyncPacketTransferProtocol.MAX_SEQUENCE_NUM,
-                AsyncPacketTransferProtocol.MAX_PAYLOAD_ID,
-                ["#IRVCBH3", image_count]
-            )
-        
-        @staticmethod
-        def make_file_len(payload_id, packet_count):
-            return AsyncPacketTransferProtocol.Packet(
-                AsyncPacketTransferProtocol.cmd_packet,
-                AsyncPacketTransferProtocol.MAX_SEQUENCE_NUM,
-                payload_id,
-                -packet_count
-            )
-        
-        @staticmethod
-        def make_file_data(sequence_num, payload_id, chunk):
-            return AsyncPacketTransferProtocol.Packet(
-                AsyncPacketTransferProtocol.data_packet,
-                sequence_num,
-                payload_id,
-                chunk
-            )
         
     def logger(self, *messages):
         if self.log:
@@ -203,7 +117,11 @@ class AsyncPacketTransferProtocol:
     async def send_packet(self, packet):
         packet_type = packet.packet_type
         sequence_num = packet.sequence_num
+        if sequence_num is None:
+            sequence_num = self.MAX_SEQUENCE_NUM
         payload_id = packet.payload_id
+        if payload_id is None:
+            payload_id = self.MAX_PAYLOAD_ID
         payload = packet.payload
         payload_len = self.write_packet_into_out_stream(
             packet_type, payload, sequence_num, payload_id
@@ -236,9 +154,9 @@ class AsyncPacketTransferProtocol:
     
     
     async def receive_packet(self, with_ack=False):
-        packet = self.protocol.receive(timeout=self.timeout, with_ack=with_ack) # Modified
+        packet = self.protocol.receive(timeout=self.timeout, with_ack=with_ack)
         if packet is None:
-            return AsyncPacketTransferProtocol.Packet(None, None, None, None)
+            return Packet(None, None, None, None)
         
         header = int.from_bytes(packet[0:6], "big")
         packet_type = header >> 47
@@ -274,7 +192,7 @@ class AsyncPacketTransferProtocol:
             self.tmp_stream = io.BytesIO()
             self.tmp_stream.seek(0)
             self.logger(f"payload: {payload}")
-            return AsyncPacketTransferProtocol.Packet(packet_type, sequence_num, payload_id, payload)
+            return Packet(packet_type, sequence_num, payload_id, payload)
         finally:
             self.tmp_stream = io.BytesIO()
             self.tmp_stream.seek(0)

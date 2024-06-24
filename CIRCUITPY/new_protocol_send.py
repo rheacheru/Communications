@@ -9,7 +9,9 @@ import os
 import asyncio
 
 import radio_diagnostics
-from new_comms_protocol import ptp, ftp
+from icpacket import Packet
+from new_comms_protocol.ptp import AsyncPacketTransferProtocol as APTP
+from new_comms_protocol.ftp import FileTransferProtocol as FTP
 
 # Chip's buffer size: 256 bytes
 # pycubed_rfm9x header size: 4 bytes
@@ -36,20 +38,17 @@ async def main():
 	radio1.enable_crc=True
 	radio1.ack_delay=0.2
 	
-	PTP = ptp.AsyncPacketTransferProtocol(radio1, packet_size=MAX_PACKET_SIZE, timeout=10, log=False)
-	FTP = ftp.FileTransferProtocol(PTP, chunk_size=MAX_PAYLOAD_SIZE, packet_delay=0, log=False)
+	ptp = APTP(radio1, packet_size=MAX_PACKET_SIZE, timeout=10, log=False)
+	ftp = FTP(ptp, chunk_size=MAX_PAYLOAD_SIZE, packet_delay=0, log=False)
 	
 	radio_diagnostics.report_diagnostics(radio1)
 	
 	while True:
 		try:
 			print("Sending telemetry ping (handshake 1) and waiting for handshake 2")
-			# radio1.send(b"#IRVCB")
-			packet = PTP.Packet.make_handshake1()
-			print(packet.payload)
-			await PTP.send_packet(packet)
-			print("sent")
-			packet = await PTP.receive_packet()
+			packet = Packet.make_handshake1()
+			await ptp.send_packet(packet)
+			packet = await ptp.receive_packet()
 			if packet.categorize() != "handshake2":
 				print(f"Packet of type {packet.categorize()} (not handshake2) received")
 				continue
@@ -61,12 +60,12 @@ async def main():
 			# image_count_ba = bytearray(image_count.to_bytes(4, "little"))
 			# packet = header + image_count_ba
 			
-			packet = PTP.Packet.make_handshake3(image_count)
+			packet = Packet.make_handshake3(image_count)
 			# radio1.send(packet)
-			await PTP.send_packet(packet)
+			await ptp.send_packet(packet)
 			
 			print("Sending a picture")
-			await FTP.send_file(TEST_IMAGE_PATH, file_id=69)
+			await ftp.send_file(TEST_IMAGE_PATH, file_id=69)
 			
 			print("20-sec cooldown period")
 			time.sleep(20)
