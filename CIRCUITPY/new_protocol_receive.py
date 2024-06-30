@@ -87,12 +87,12 @@ def synctime(pool):
 
 def verify_packet(packet, desired_type):
 	# Verify that the packet has the desired type
-	assert desired_type in ("handshake1", "handshake2", "handshake3", "file_len", "file_data", "none")
+	assert desired_type in Packet.packet_types, "Desired type is invalid"
 	if packet.categorize() == desired_type:
 		# print(f"Packet is of desired type {desired_type}")
 		return True
 	else:
-		# print(f"Packet is of undesired type {packet.categorize()}, not {desired_type}")
+		print(f"Packet is of undesired type {packet.categorize()}, not {desired_type}")
 		return False
 
 async def main():
@@ -127,11 +127,30 @@ async def main():
 	# pool = attempt_wifi()
 	
 	ptp = APTP(radio, packet_size=MAX_PAYLOAD_SIZE, timeout=10, log=False, enable_padding=False)
-	ftp = FTP(ptp, chunk_size=CHUNK_SIZE, log=False)
+	ftp = FTP(ptp, chunk_size=CHUNK_SIZE, log=True)
 	
 	radio_diagnostics.report_diagnostics(radio)
 	
 	check_write_permissions()
+	
+	# Persistent data
+	try:
+		with open("persistent_data.txt") as f:
+			images_aware = int(f.readline())
+			incomplete_images = list(map(int, f.readline().split()))
+			to_assemble = list(map(int, f.readline().split()))
+	except: # First run
+		images_aware = 0
+		incomplete_images = []
+		to_assemble = []
+	
+	def save_data():
+		with open("persistent_data.txt", "w") as f:
+				f.write(str(images_aware))
+				f.write("\n")
+				f.write(" ".join(map(str, incomplete_images)))
+				f.write("\n")
+				f.write(" ".join(map(str, to_assemble)))
 	
 	while True:
 		try:
@@ -153,34 +172,44 @@ async def main():
 			print("Handshake 3 received")
 			image_count = packet.payload[1]
 			print(f"CubeSat has taken {image_count} images so far")
-
-			# Start listening for image packets
-			while True:
-				# to do: request new images
-				print("Listening for image packets")
-				start_time = time.monotonic()
-				packet_list, missing, image_id = await ftp.receive_file_custom()
-				# to do: if image partially received, request again
-				end_time = time.monotonic()
-				if packet_list is None:
-					print("No image packet received")
-					break
-				print(f"Image {image_id} received, taking {end_time - start_time} seconds")
-				if missing.count(1) > 0:
-					print(f"Missing packets: {missing}")
-				else:
-					print("No missing packets")
+			
+			# Update persistent data
+			if image_count > images_aware:
+				new_images = list(range(images_aware+1, image_count+1))
+				incomplete_images.extend(new_images)
+				images_aware = image_count
+					
+			# Request incomplete images
+			# To do: record reception time datetime.now().isoformat() and time taken
+			while incomplete_images:
+				image_id = incomplete_images[0]
+				filename = f"image_{image_id}.jpeg"
+				local_path = f"received_images/image_{image_id}"
 				
-				# filename = datetime.now().isoformat().replace(":","-")
-				with open(f"image_{image_id}.jpeg", "wb") as f:
-					for chunk in packet_list:
-						f.write(chunk)
+				start_time = time.monotonic()
+				success = await ftp.request_file_custom(image_id, filename, local_path, defer_assembly=True)
+				end_time = time.monotonic()
+				print(f"Image {image_id} {'' if success else 'not '}fully received, taking {end_time-start_time} sec")
+				
+				if success:
+					incomplete_images.remove(image_id)
+					to_assemble.append(image_id)
+					save_data()
+				else:
+					save_data()
+					break
 			
-			# Request images or return to standby
-			
+			for image_id in to_assemble.copy():
+				filename = f"image_{image_id}.jpeg"
+				local_path = f"received_images/image_{image_id}"
+				success = ftp.assemble_file(filename, local_path)
+				if success:
+					print(f"Image {image_id} assembled")
+					to_assemble.remove(image_id)
+					save_data()
 		
 		except Exception as e:
-			print("Error in Main Loop: " + ''.join(traceback.format_exception(e)))
+			print("Error in Main Loop:", ''.join(traceback.format_exception(e)))
 
 if __name__ == "__main__":
 	asyncio.run(main())

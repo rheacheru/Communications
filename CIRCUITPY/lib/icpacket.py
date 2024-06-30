@@ -11,6 +11,7 @@ class Packet:
 	handshake1   cmd    ["#IRVCB", -1]
 	handshake2   cmd    ["#IRVCBH2", -1]
 	handshake3   cmd    ["#IRVCBH3", image_count]
+	file_req     cmd    ["req", "all" | [packet_ids]]
 	file_len     cmd    packet_count 
 	file_data    data   chunk_data
 	'''
@@ -23,6 +24,7 @@ class Packet:
 	
 	data_packet = 0
 	cmd_packet = 1
+	packet_types = ("handshake1", "handshake2", "handshake3", "file_req", "file_len", "file_data", "none")
 
 	def categorize(self):
 		try:
@@ -36,6 +38,8 @@ class Packet:
 						return "handshake2"
 					elif self.payload[0] == "#IRVCBH3":
 						return "handshake3"
+					elif self.payload[0] == "req":
+						return "file_req"
 				return "file_len"
 			else:
 				return "file_data"
@@ -53,6 +57,11 @@ class Packet:
 	@staticmethod
 	def make_handshake3(image_count):
 		return Packet(Packet.cmd_packet, None, None, ["#IRVCBH3", image_count])
+	
+	@staticmethod
+	def make_file_req(file_id, packets=None):
+		req_body = "all" if packets is None else packets
+		return Packet(Packet.cmd_packet, None, file_id, ["req", req_body])
 	
 	@staticmethod
 	def make_file_len(payload_id, packet_count):
