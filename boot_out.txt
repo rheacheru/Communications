@@ -1,0 +1,7 @@
+Adafruit CircuitPython 8.2.0-rc.0 on 2023-06-23; FeatherS2 with ESP32S2
+Board ID:unexpectedmaker_feathers2
+UID:06559FBE7ECA
+boot.py output:
+Traceback (most recent call last):
+  File "boot.py", line 2
+IndentationError: unexpected indent

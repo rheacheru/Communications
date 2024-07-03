@@ -314,5 +314,5 @@ $RECYCLE.BIN/
 
 # End of https://www.toptal.com/developers/gitignore/api/macos,osx,windows,linux,visualstudiocode,vim,python,git
 
-CIRCUITPY/secrets.py
-CIRCUITPY/ihscubesat-c9dc08a671e1.json
+secrets.py
+ihscubesat-c9dc08a671e1.json
