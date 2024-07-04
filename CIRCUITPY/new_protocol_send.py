@@ -62,6 +62,8 @@ async def send(cubesat, functions):
 	# msgpack adds 2 bytes overhead for bytes payloads
 	CHUNK_SIZE = MAX_PAYLOAD_SIZE - 2 # 243
 	TEST_IMAGE_PATH = "THBBlueEarthTest.jpeg"
+	IMAGE_DIRECTORY = "test_images" # Change when the camera code is done
+	IMAGE_COUNT_FILE = "image_count.txt" # Placeholder
 	
 	# ftp = FTP(cubesat.ptp, chunk_size=CHUNK_SIZE, packet_delay=0, log=False)
 	
@@ -99,7 +101,15 @@ async def send(cubesat, functions):
 				image_path = await capture(cubesat)
 			
 			# Get number of images taken
-			image_count = len(os.listdir("test_images")) # PLACEHOLDER
+			try:
+				print(f"Note: make the camera code track image count in {IMAGE_COUNT_FILE}")
+				with open(IMAGE_COUNT_FILE) as f:
+					image_count = int(f.readline()) # one line with the image count
+			except:
+				print(f"Couldn't find {IMAGE_COUNT_FILE}, defaulting to 0")
+				# image_count = len(os.listdir(IMAGE_DIRECTORY))
+				image_count = 0
+			
 			packet = Packet.make_handshake3(image_count)
 			await ptp.send_packet(packet)
 				
@@ -123,7 +133,7 @@ async def send(cubesat, functions):
 				
 				# Get image with corresponding ID
 				image_id = packet.payload_id
-				image_path = f"test_images/test_image_{image_id}.jpeg" # PLACEHOLDER
+				image_path = f"{IMAGE_DIRECTORY}/image_{image_id}.jpeg" # PLACEHOLDER
 				
 				request = packet.payload[1]
 				print(f"Request received for image {image_id}, {request}")
