@@ -16,11 +16,16 @@ import traceback
 # from comms import file_receive
 import os
 import asyncio
+import json
+import adafruit_hashlib as hashlib
+
 
 import radio_diagnostics
 from icpacket import Packet
 from new_comms_protocol.ptp import AsyncPacketTransferProtocol as APTP
 from new_comms_protocol.ftp import FileTransferProtocol as FTP
+
+settings_hash = -1
 
 def check_write_permissions():
 	try:
@@ -152,15 +157,37 @@ async def main():
 				f.write("\n")
 				f.write(" ".join(map(str, to_assemble)))
 	
+	async def save_telemetry(payload):
+		filepath = f'received_telemetry/{datetime.now().isoformat().replace(":","-")}.txt'
+		with open(filepath, 'w') as f:
+			f.write(json.dumps(payload))
+
+	async def load_settings():
+		with open('camera_settings.json', 'rb') as file:
+			settings = file.read()
+			digest = hashlib.md5(file.read()).hexdigest()
+			if digest != settings_hash:
+				settings_hash = digest
+				return json.loads(settings)
+		return -1
+		
+	
 	while True:
 		try:
 			print("Waiting for telemetry ping (handshake 1)")   
 			packet = await ptp.receive_packet()
 			if not verify_packet(packet, "handshake1"):
+				asyncio.sleep(1)
 				continue
 			
 			print("Telemetry ping (handshake 1) received")
-			packet = Packet.make_handshake2()
+			await save_telemetry(packet.payload[1])
+			
+			camera_settings = await load_settings()
+			if isinstance(camera, dict):
+				print("camera settings updated")
+
+			packet = Packet.make_handshake2([camera_settings, True])
 			await ptp.send_packet(packet)
 			print("Handshake 2 sent")
 			
@@ -213,4 +240,3 @@ async def main():
 
 if __name__ == "__main__":
 	asyncio.run(main())
-
