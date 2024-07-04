@@ -18,8 +18,11 @@ class FileTransferProtocol:
         self.chunk_size = chunk_size # Modified
         self.packet_delay = packet_delay # Modified
         
-        if request_size > 48:
-            print("Warning: Request size should not exceed 48 on PyCubed")
+        try:
+            if request_size > 48:
+                print("Warning: Request size should not exceed 48 on PyCubed")
+        except:
+            print("Warning: Request size not int")
         self.request_size = request_size
 
     async def request_file(self, remote_path, local_path, retries=3):

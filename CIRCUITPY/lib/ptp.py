@@ -185,8 +185,10 @@ class AsyncPacketTransferProtocol:
         return True
     '''
     
-    async def receive_packet(self, with_ack=False):
-        packet = self.protocol.receive(timeout=self.timeout, with_ack=with_ack)
+    async def receive_packet(self, with_ack=False, timeout=None):
+        if timeout is None:
+            timeout = self.timeout
+        packet = self.protocol.receive(timeout=timeout, with_ack=with_ack)
         if packet is None:
             return Packet(None, None, None, None)
         
