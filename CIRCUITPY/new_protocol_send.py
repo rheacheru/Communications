@@ -86,14 +86,22 @@ async def send(cubesat, functions):
 				
 			print("Handshake 2 received, sending handshake 3")
 			
+			# writing new camera settings
+			if (packet.payload[1] is not None) and isinstance(packet.payload[1], dict):
+				save_settings(packet.payload[1], cubesat)
+			
+			# setting new timeout
+			if packet.payload[2] is not None:
+				cubesat.ptp.timeout = packet.payload[2]
+			
+			# if requested, take picture
+			if packet.payload[3]:
+				image_path = await capture(cubesat)
+			
 			# Get number of images taken
 			image_count = len(os.listdir("test_images")) # PLACEHOLDER
 			packet = Packet.make_handshake3(image_count)
 			await ptp.send_packet(packet)
-			
-			#writing new camera settings
-			if packet.payload[1] != -1 and isinstance(packet.payload[1], dict):
-				save_settings(packet.payload[1], cubesat)
 				
 			# image_path = await capture(cubesat)
 
@@ -103,6 +111,14 @@ async def send(cubesat, functions):
 				print("Listening for requests")
 				packet = await cubesat.ptp.receive_packet()
 				if not verify_packet(packet, "file_req"):
+					if verify_packet(packet, "file_del"):
+						image_id = packet.payload_id
+						try:
+							os.remove(f"{IMAGE_DIRECTORY}/image_{image_id}.jpeg")
+							print(f"Removed image with id: {image_id}")
+						except:
+							print(f"No image with id: {image_id} to be removed")
+							pass
 					break
 				
 				# Get image with corresponding ID

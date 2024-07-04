@@ -187,7 +187,7 @@ async def main():
 			if isinstance(camera, dict):
 				print("camera settings updated")
 
-			packet = Packet.make_handshake2([camera_settings, True])
+			packet = Packet.make_handshake2(cam_settings=camera_settings) # can send new_timeout=T or take_picture=False
 			await ptp.send_packet(packet)
 			print("Handshake 2 sent")
 			
@@ -222,6 +222,9 @@ async def main():
 					incomplete_images.remove(image_id)
 					to_assemble.append(image_id)
 					save_data()
+					# send confirmation (deletion)
+					packet = Packet.make_file_del(image_id)
+					await ptp.send_packet(packet)
 				else:
 					save_data()
 					break
