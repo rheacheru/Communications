@@ -192,7 +192,7 @@ async def main():
 			print("Handshake 2 sent")
 			
 			print("Waiting for handshake 3")
-			packet = await ptp.receive_packet()
+			packet = await ptp.receive_packet(timeout=40) # Increased timeout for taking image
 			if not verify_packet(packet, "handshake3"):
 				continue
 			

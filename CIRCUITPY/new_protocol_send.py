@@ -115,7 +115,7 @@ async def send(cubesat, functions):
 				
 			# image_path = await capture(cubesat)
 
-			await cubesat.ftp.send_file(image_path)
+			# await cubesat.ftp.send_file(image_path)
 
 			while True:
 				print("Listening for requests")
@@ -128,8 +128,9 @@ async def send(cubesat, functions):
 							print(f"Removed image with id: {image_id}")
 						except:
 							print(f"No image with id: {image_id} to be removed")
-							pass
-					break
+					else:
+						asyncio.sleep(1)
+						break
 				
 				# Get image with corresponding ID
 				image_id = packet.payload_id
