@@ -208,8 +208,10 @@ async def main():
 					
 			# Request incomplete images
 			# To do: record reception time datetime.now().isoformat() and time taken
-			while incomplete_images:
-				image_id = incomplete_images[0]
+			while True:
+				if images_aware not in incomplete_images: # most recent already received
+					break
+				image_id = images_aware # assume IDs are 1 to images_aware
 				filename = f"image_{image_id}.jpeg"
 				local_path = f"received_images/image_{image_id}"
 				

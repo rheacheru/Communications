@@ -124,8 +124,9 @@ async def send(cubesat, functions):
 					if verify_packet(packet, "file_del"):
 						image_id = packet.payload_id
 						try:
-							os.remove(f"{IMAGE_DIRECTORY}/image_{image_id}.jpeg")
-							print(f"Removed image with id: {image_id}")
+							# os.remove(f"{IMAGE_DIRECTORY}/image_{image_id}.jpeg")
+							# print(f"Removed image with id: {image_id}")
+							print(f"Would remove image with id: {image_id}, but testing")
 						except:
 							print(f"No image with id: {image_id} to be removed")
 					else:
