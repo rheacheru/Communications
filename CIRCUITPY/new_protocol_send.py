@@ -13,7 +13,6 @@ import json
 
 import radio_diagnostics
 from icpacket import Packet
-from ftp import FileTransferProtocol as FTP
 
 import camera_settings as cset
 
@@ -64,8 +63,6 @@ async def send(cubesat, functions):
 	TEST_IMAGE_PATH = "THBBlueEarthTest.jpeg"
 	IMAGE_DIRECTORY = "test_images" # Change when the camera code is done
 	IMAGE_COUNT_FILE = "image_count.txt" # Placeholder
-	
-	ftp = FTP(cubesat.ptp, chunk_size=CHUNK_SIZE, packet_delay=0, log=False)
 	
 	camera_settings = cset.camera_settings
 
@@ -146,9 +143,9 @@ async def send(cubesat, functions):
 				
 				if request == "all":
 					# to do: send time taken
-					await ftp.send_file(image_path, image_id)
+					await cubesat.ftp.send_file(image_path, image_id)
 				else:
-					await ftp.send_partial_file(image_path, image_id, request)
+					await cubesat.ftp.send_partial_file(image_path, image_id, request)
 			
 			asyncio.sleep(1)
 
