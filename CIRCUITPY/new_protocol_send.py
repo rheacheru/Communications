@@ -1,5 +1,5 @@
 '''Created by Irvington Cubesat members Jerry Sun and Shreya Kolla'''
-from pysquared import cubesat
+# from pysquared import cubesat
 # from functions import functions as f
 # import board
 # import busio
@@ -61,7 +61,7 @@ async def send(cubesat, functions):
 	# msgpack adds 2 bytes overhead for bytes payloads
 	CHUNK_SIZE = MAX_PAYLOAD_SIZE - 2 # 243
 	TEST_IMAGE_PATH = "THBBlueEarthTest.jpeg"
-	IMAGE_DIRECTORY = "test_images" # Change when the camera code is done
+	IMAGE_DIRECTORY = "images_to_send" # Change when the camera code is done
 	IMAGE_COUNT_FILE = "image_count.txt" # Placeholder
 	
 	camera_settings = cset.camera_settings
@@ -73,10 +73,9 @@ async def send(cubesat, functions):
 			print("Sending telemetry ping (handshake 1) and waiting for handshake 2")
 			
 			#creating telemetry payload
-			t_payload = ["TEST", "TELEMETRY", "PAYLOAD"]
-			# state_payload = functions.create_state_packet()
-			# t_payload = functions.get_imu_data() #imu data
-			# t_payload[0:0] = state_payload #combining state and imu data
+			# t_payload = ["TEST", "TELEMETRY", "PAYLOAD"]
+			t_payload = functions.create_state_packet()
+			t_payload.extend(functions.get_imu_data())
 
 			packet = Packet.make_handshake1(t_payload)
 			await cubesat.ptp.send_packet(packet)
@@ -102,7 +101,6 @@ async def send(cubesat, functions):
 			
 			# Get number of images taken
 			try:
-				print(f"Note: make the camera code track image count in {IMAGE_COUNT_FILE}")
 				with open(IMAGE_COUNT_FILE) as f:
 					image_count = int(f.readline()) # one line with the image count
 			except:
@@ -124,9 +122,9 @@ async def send(cubesat, functions):
 					if verify_packet(packet, "file_del"):
 						image_id = packet.payload_id
 						try:
-							# remove(f"{IMAGE_DIRECTORY}/image_{image_id}.jpeg")
-							# print(f"Removed image with id: {image_id}")
-							print(f"Would remove image with id: {image_id}, but testing")
+							remove(f"{IMAGE_DIRECTORY}/image{image_id}.jpeg")
+							print(f"Removed image with id: {image_id}")
+							# print(f"Would remove image with id: {image_id}, but testing")
 						except:
 							print(f"No image with id: {image_id} to be removed")
 						continue
@@ -136,7 +134,7 @@ async def send(cubesat, functions):
 				
 				# Get image with corresponding ID
 				image_id = packet.payload_id
-				image_path = f"{IMAGE_DIRECTORY}/image_{image_id}.jpeg" # PLACEHOLDER
+				image_path = f"{IMAGE_DIRECTORY}/image{image_id}.jpeg" # PLACEHOLDER
 				
 				request = packet.payload[1]
 				print(f"Request received for image {image_id}, {request}")
@@ -151,7 +149,3 @@ async def send(cubesat, functions):
 
 		except Exception as e:
 			print("Error in Main Loop:", ''.join(format_exception(e)))
-
-async def main():
-	# functions = f(cubesat)
-	await send(cubesat, None)
