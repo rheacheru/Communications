@@ -25,7 +25,6 @@ from icpacket import Packet
 from new_comms_protocol.ptp import AsyncPacketTransferProtocol as APTP
 from new_comms_protocol.ftp import FileTransferProtocol as FTP
 
-settings_hash = -1
 
 def check_write_permissions():
 	try:
@@ -114,6 +113,8 @@ async def main():
 	# msgpack adds 2 bytes overhead for bytes payloads
 	CHUNK_SIZE = MAX_PAYLOAD_SIZE - 2 # 244
 	
+	settings_hash = [-1] # hack to pass by reference
+	
 	CS = digitalio.DigitalInOut(board.D20)
 	CS.switch_to_output(True)
 	RST = digitalio.DigitalInOut(board.D21)
@@ -158,16 +159,17 @@ async def main():
 				f.write(" ".join(map(str, to_assemble)))
 	
 	async def save_telemetry(payload):
-		filepath = f'received_telemetry/{datetime.now().isoformat().replace(":","-")}.txt'
+		filename = datetime.now().isoformat().replace(':','-')
+		filepath = f"received_telemetry/{filename}.txt"
 		with open(filepath, 'w') as f:
 			f.write(json.dumps(payload))
 
-	async def load_settings():
+	async def load_settings(settings_hash):
 		with open('camera_settings.json', 'rb') as file:
 			settings = file.read()
 			digest = hashlib.md5(file.read()).hexdigest()
-			if digest != settings_hash:
-				settings_hash = digest
+			if digest != settings_hash[0]:
+				settings_hash[0] = digest
 				return json.loads(settings)
 		return -1
 		
@@ -177,14 +179,16 @@ async def main():
 			print("Waiting for telemetry ping (handshake 1)")   
 			packet = await ptp.receive_packet()
 			if not verify_packet(packet, "handshake1"):
-				asyncio.sleep(1)
+				await asyncio.sleep(1)
 				continue
 			
 			print("Telemetry ping (handshake 1) received")
+			print("TESTING: reporting telemetry")
+			print(packet.payload[1])
 			await save_telemetry(packet.payload[1])
 			
-			camera_settings = await load_settings()
-			if isinstance(camera, dict):
+			camera_settings = await load_settings(settings_hash)
+			if isinstance(camera_settings, dict):
 				print("camera settings updated")
 
 			packet = Packet.make_handshake2(cam_settings=camera_settings) # can send new_timeout=T or take_picture=False
