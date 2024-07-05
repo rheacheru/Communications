@@ -1,17 +1,17 @@
 '''Created by Irvington Cubesat members Jerry Sun and Shreya Kolla'''
 from pysquared import cubesat
 # from functions import functions as f
-import board
-import busio
-import digitalio
-import traceback
+# import board
+# import busio
+# import digitalio
+from traceback import format_exception
 
 # import time
-import os
-import asyncio
-import json
+from os import listdir, remove
+from asyncio import sleep
+from json import dumps
 
-import radio_diagnostics
+from radio_diagnostics import report_diagnostics
 from icpacket import Packet
 
 import camera_settings as cset
@@ -37,7 +37,7 @@ def save_settings(new_settings, camera_settings, cubesat):
 		camera_settings = new_settings
 		with open("camera_settings.py", 'w') as new_settings:
 			new_settings.write("import adafruit_ov5640\n")
-			new_settings.write(f'camera_settings = {json.dumps(new_settings, indent=4)}')
+			new_settings.write(f'camera_settings = {dumps(new_settings, indent=4)}')
 		for k in old_keys:
    			setattr(cubesat.cam, k, camera_settings[k])
 	else:
@@ -66,7 +66,7 @@ async def send(cubesat, functions):
 	
 	camera_settings = cset.camera_settings
 
-	radio_diagnostics.report_diagnostics(cubesat.radio1)
+	report_diagnostics(cubesat.radio1)
 	
 	while True:
 		try:
@@ -83,7 +83,7 @@ async def send(cubesat, functions):
 			packet = await cubesat.ptp.receive_packet()
 			
 			if not verify_packet(packet, "handshake2"):
-				await asyncio.sleep(30)
+				await sleep(30)
 				continue
 				
 			print("Handshake 2 received, sending handshake 3")
@@ -107,7 +107,7 @@ async def send(cubesat, functions):
 					image_count = int(f.readline()) # one line with the image count
 			except:
 				print(f"Couldn't find {IMAGE_COUNT_FILE}, defaulting to 0")
-				# image_count = len(os.listdir(IMAGE_DIRECTORY))
+				# image_count = len(listdir(IMAGE_DIRECTORY))
 				image_count = 0
 			
 			packet = Packet.make_handshake3(image_count)
@@ -124,14 +124,14 @@ async def send(cubesat, functions):
 					if verify_packet(packet, "file_del"):
 						image_id = packet.payload_id
 						try:
-							# os.remove(f"{IMAGE_DIRECTORY}/image_{image_id}.jpeg")
+							# remove(f"{IMAGE_DIRECTORY}/image_{image_id}.jpeg")
 							# print(f"Removed image with id: {image_id}")
 							print(f"Would remove image with id: {image_id}, but testing")
 						except:
 							print(f"No image with id: {image_id} to be removed")
 						continue
 					else:
-						asyncio.sleep(1)
+						sleep(1)
 						break
 				
 				# Get image with corresponding ID
@@ -147,10 +147,10 @@ async def send(cubesat, functions):
 				else:
 					await cubesat.ftp.send_partial_file(image_path, image_id, request)
 			
-			asyncio.sleep(1)
+			sleep(1)
 
 		except Exception as e:
-			print("Error in Main Loop:", ''.join(traceback.format_exception(e)))
+			print("Error in Main Loop:", ''.join(format_exception(e)))
 
 async def main():
 	# functions = f(cubesat)

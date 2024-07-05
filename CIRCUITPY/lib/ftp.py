@@ -2,10 +2,9 @@
 Irvington CubeSat's file transfer protocol for CircuitPython
 Inspired by `ftp` from Stanford PyGS
 """
-import os
-import math
-import time 
-import asyncio
+from os import mkdir, listdir, stat
+from time import monotonic
+from asyncio import sleep
 from icpacket import Packet
 
 class FileTransferProtocol:
@@ -46,7 +45,7 @@ class FileTransferProtocol:
         '''
         # Make local_path directory
         try:
-            os.mkdir(local_path)
+            mkdir(local_path)
         except:
             pass
         
@@ -55,8 +54,7 @@ class FileTransferProtocol:
         
         # Get packet count and packet status and send the first request
         # State: num_packets, missing, waiting_on
-        ls = os.listdir(local_path)
-        if "packet_status.txt" in ls: # file has been requested before
+        if "packet_status.txt" in listdir(local_path): # file has been requested before
             with open(f"{local_path}/packet_status.txt") as f:
                 num_packets = int(f.readline())
                 missing = list(map(int, f.readline().strip()))
@@ -123,18 +121,18 @@ class FileTransferProtocol:
     
     async def receive_file_custom(self, incoming_packets, local_path, timeout=10):
         received_packets = []
-        last_time = time.monotonic()
+        last_time = monotonic()
         for packet_num in range(incoming_packets):
             packet = await self.ptp.receive_packet()
             if packet.categorize() != "file_data":
                 print(f"Packet of type {packet.categorize()} (not file_data) received")
-                if time.monotonic() - last_time >= timeout:
+                if monotonic() - last_time >= timeout:
                     print(f"No valid packets received in the past {timeout} seconds, breaking")
                     break
                 continue
             
             # Packet received
-            last_time = time.monotonic()
+            last_time = monotonic()
             with open(f"{local_path}/packet_{packet.sequence_num}", "wb") as f:
                 f.write(packet.payload)
             received_packets.append(packet.sequence_num)
@@ -163,7 +161,7 @@ class FileTransferProtocol:
         with open(filename, "rb") as f:
             for packet_num in request:
                 if self.packet_delay > 0:
-                    await asyncio.sleep(self.packet_delay)
+                    await sleep(self.packet_delay)
                 print(f"Sending packet {packet_num+1}")
                 f.seek(self.chunk_size * packet_num)
                 chunk = f.read(self.chunk_size)
@@ -182,31 +180,19 @@ class FileTransferProtocol:
             chunk_size (int, optional): chunk sizes that will be sent. Defaults to 64.
         """
         with open(filename, 'rb') as f:
-            stats = os.stat(filename)
-            filesize = stats[6]
+            filesize = stat(filename)[6]
             
             # send the number of packets for the client
             print("Sending packet count and file ID")
-            packet_count = math.ceil(filesize / self.chunk_size)
+            packet_count = (filesize-1) // self.chunk_size + 1 # ceil
             packet = Packet.make_file_len(file_id, packet_count)
             await self.ptp.send_packet(packet)
-            # await self.ptp.send_packet(
-                # self.ptp.data_packet,
-                 # - packet_count,
-                # payload_id=file_id
-            # )
 
             # send all the chunks
             for chunk, packet_num in self._read_chunks(f, self.chunk_size):
                 if self.packet_delay > 0:
-                    await asyncio.sleep(self.packet_delay)
+                    await sleep(self.packet_delay)
                 print(f"Sending packet {packet_num+1}")
-                # success = await self.ptp.send_packet(
-                    # self.ptp.data_packet,
-                    # chunk,
-                    # sequence_num=packet_num,
-                    # payload_id=file_id
-                # )
                 packet = Packet.make_file_data(packet_num, file_id, chunk)
                 success = await self.ptp.send_packet(packet)
                 if not success:
