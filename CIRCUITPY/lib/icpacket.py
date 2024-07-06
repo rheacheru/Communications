@@ -24,7 +24,7 @@ class Packet:
 	
 	data_packet = 0
 	cmd_packet = 1
-	packet_types = ("handshake1", "handshake2", "handshake3", "file_req", "file_len", "file_data", "none")
+	packet_types = ("handshake1", "handshake2", "handshake3", "file_req", "file_len", "file_data", "none", "state_of_health", "file_del")
 
 	def categorize(self):
 		try:
@@ -40,6 +40,10 @@ class Packet:
 						return "handshake3"
 					elif self.payload[0] == "req":
 						return "file_req"
+					elif self.payload[0] == "#IRCVBST":
+						return "state_of_health"
+				elif self.payload == "del":
+					return "file_del"
 				return "file_len"
 			else:
 				return "file_data"
@@ -47,12 +51,12 @@ class Packet:
 			print("Error categorizing packet:", e)
 
 	@staticmethod
-	def make_handshake1():
-		return Packet(Packet.cmd_packet, None, None, ["#IRVCB", -1])
+	def make_handshake1(payload):
+		return Packet(Packet.cmd_packet, None, None, ["#IRVCB", payload])
 	
 	@staticmethod
-	def make_handshake2():
-		return Packet(Packet.cmd_packet, None, None, ["#IRVCBH2", -1])
+	def make_handshake2(cam_settings=None, new_timeout=None, take_picture=True):
+		return Packet(Packet.cmd_packet, None, None, ["#IRVCBH2", cam_settings, new_timeout, take_picture])
 	
 	@staticmethod
 	def make_handshake3(image_count):
@@ -70,3 +74,7 @@ class Packet:
 	@staticmethod
 	def make_file_data(sequence_num, payload_id, chunk):
 		return Packet(Packet.data_packet, sequence_num, payload_id, chunk)
+	
+	@staticmethod
+	def make_file_del(file_id):
+		return Packet(Packet.cmd_packet, None, file_id, "del")

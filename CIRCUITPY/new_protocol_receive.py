@@ -16,11 +16,15 @@ import traceback
 # from comms import file_receive
 import os
 import asyncio
+import json
+import adafruit_hashlib as hashlib
+
 
 import radio_diagnostics
 from icpacket import Packet
 from new_comms_protocol.ptp import AsyncPacketTransferProtocol as APTP
 from new_comms_protocol.ftp import FileTransferProtocol as FTP
+
 
 def check_write_permissions():
 	try:
@@ -109,6 +113,8 @@ async def main():
 	# msgpack adds 2 bytes overhead for bytes payloads
 	CHUNK_SIZE = MAX_PAYLOAD_SIZE - 2 # 244
 	
+	settings_hash = [-1] # hack to pass by reference
+	
 	CS = digitalio.DigitalInOut(board.D20)
 	CS.switch_to_output(True)
 	RST = digitalio.DigitalInOut(board.D21)
@@ -152,20 +158,45 @@ async def main():
 				f.write("\n")
 				f.write(" ".join(map(str, to_assemble)))
 	
+	async def save_telemetry(payload):
+		filename = datetime.now().isoformat().replace(':','-')
+		filepath = f"received_telemetry/{filename}.txt"
+		with open(filepath, 'w') as f:
+			f.write(json.dumps(payload))
+
+	async def load_settings(settings_hash):
+		with open('camera_settings.json', 'rb') as file:
+			settings = file.read()
+			digest = hashlib.md5(file.read()).hexdigest()
+			if digest != settings_hash[0]:
+				settings_hash[0] = digest
+				return json.loads(settings)
+		return -1
+		
+	
 	while True:
 		try:
 			print("Waiting for telemetry ping (handshake 1)")   
 			packet = await ptp.receive_packet()
 			if not verify_packet(packet, "handshake1"):
+				await asyncio.sleep(1)
 				continue
 			
 			print("Telemetry ping (handshake 1) received")
-			packet = Packet.make_handshake2()
+			print("TESTING: reporting telemetry")
+			print(packet.payload[1])
+			await save_telemetry(packet.payload[1])
+			
+			camera_settings = await load_settings(settings_hash)
+			if isinstance(camera_settings, dict):
+				print("camera settings updated")
+
+			packet = Packet.make_handshake2(cam_settings=camera_settings) # can send new_timeout=T or take_picture=False
 			await ptp.send_packet(packet)
 			print("Handshake 2 sent")
 			
 			print("Waiting for handshake 3")
-			packet = await ptp.receive_packet()
+			packet = await ptp.receive_packet(timeout=40) # Increased timeout for taking image
 			if not verify_packet(packet, "handshake3"):
 				continue
 			
@@ -181,8 +212,10 @@ async def main():
 					
 			# Request incomplete images
 			# To do: record reception time datetime.now().isoformat() and time taken
-			while incomplete_images:
-				image_id = incomplete_images[0]
+			while True:
+				if images_aware not in incomplete_images: # most recent already received
+					break
+				image_id = images_aware # assume IDs are 1 to images_aware
 				filename = f"image_{image_id}.jpeg"
 				local_path = f"received_images/image_{image_id}"
 				
@@ -195,6 +228,9 @@ async def main():
 					incomplete_images.remove(image_id)
 					to_assemble.append(image_id)
 					save_data()
+					# send confirmation (deletion)
+					packet = Packet.make_file_del(image_id)
+					await ptp.send_packet(packet)
 				else:
 					save_data()
 					break
@@ -213,4 +249,3 @@ async def main():
 
 if __name__ == "__main__":
 	asyncio.run(main())
-
