@@ -316,3 +316,6 @@ $RECYCLE.BIN/
 
 CIRCUITPY/secrets.py
 CIRCUITPY/ihscubesat-c9dc08a671e1.json
+
+ihscubesat-c9dc08a671e1.json
+secrets.py
