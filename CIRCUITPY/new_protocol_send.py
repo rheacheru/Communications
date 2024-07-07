@@ -73,9 +73,9 @@ async def send(cubesat, functions):
 			print("Sending telemetry ping (handshake 1) and waiting for handshake 2")
 			
 			#creating telemetry payload
-			# t_payload = ["TEST", "TELEMETRY", "PAYLOAD"]
-			t_payload = functions.create_state_packet()
-			t_payload.extend(functions.get_imu_data())
+			t_payload = ["TEST", "TELEMETRY", "PAYLOAD"]
+			# t_payload = functions.create_state_packet()
+			# t_payload.extend(functions.get_imu_data())
 
 			packet = Packet.make_handshake1(t_payload)
 			await cubesat.ptp.send_packet(packet)
