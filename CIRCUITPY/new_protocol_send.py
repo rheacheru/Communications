@@ -61,7 +61,7 @@ async def send(cubesat, functions):
 	# msgpack adds 2 bytes overhead for bytes payloads
 	CHUNK_SIZE = MAX_PAYLOAD_SIZE - 2 # 243
 	TEST_IMAGE_PATH = "THBBlueEarthTest.jpeg"
-	IMAGE_DIRECTORY = "images_to_send" # Change when the camera code is done
+	IMAGE_DIRECTORY = "images-to-send" # Change when the camera code is done
 	IMAGE_COUNT_FILE = "image_count.txt" # Placeholder
 	
 	camera_settings = cset.camera_settings
@@ -82,7 +82,7 @@ async def send(cubesat, functions):
 			packet = await cubesat.ptp.receive_packet()
 			
 			if not verify_packet(packet, "handshake2"):
-				await sleep(30)
+				await sleep(10)
 				continue
 				
 			print("Handshake 2 received, sending handshake 3")
@@ -129,7 +129,7 @@ async def send(cubesat, functions):
 							print(f"No image with id: {image_id} to be removed")
 						continue
 					else:
-						sleep(1)
+						await sleep(1)
 						break
 				
 				# Get image with corresponding ID
@@ -145,7 +145,7 @@ async def send(cubesat, functions):
 				else:
 					await cubesat.ftp.send_partial_file(image_path, image_id, request)
 			
-			sleep(1)
+			await sleep(1)
 
 		except Exception as e:
 			print("Error in Main Loop:", ''.join(format_exception(e)))
