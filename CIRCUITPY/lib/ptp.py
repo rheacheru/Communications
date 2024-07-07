@@ -41,7 +41,7 @@ class AsyncPacketTransferProtocol:
     
     def write_packet_into_out_stream(self, packet_type, payload, sequence_num, payload_id):
         self.out_stream.seek(0)
-		tmp_stream = BytesIO()
+        tmp_stream = BytesIO()
         if packet_type != self.cmd_packet and packet_type != self.data_packet:
             self.logger("packet type error")
             return -1
@@ -61,7 +61,7 @@ class AsyncPacketTransferProtocol:
             if payload_len > self.packet_size:
                 self.logger(f"packet too long ({payload_len} bytes, limit is {self.packet_size})")
                 return -1
-			
+            
             header = (packet_type << 47) | (payload_len << 39) | (sequence_num << 20) | payload_id
             self.logger(f"header: {header}")
             self.logger(f"packet type: {packet_type}", f"payload len: {payload_len}",
@@ -87,18 +87,18 @@ class AsyncPacketTransferProtocol:
         )
         if payload_len == -1:
             return False
-		
+        
         self.out_stream.seek(0)
-		raw_data = self.out_stream.read(self.MAX_SIZE)
+        raw_data = self.out_stream.read(self.MAX_SIZE)
         self.logger(f"wrote data: {raw_data}")
         if with_ack:
-			self.protocol.send_with_ack(raw_data)
-		else:
-			self.protocol.send(raw_data)
+            self.protocol.send_with_ack(raw_data)
+        else:
+            self.protocol.send(raw_data)
         self.out_stream.seek(0)
         return True
     
-	# send_packet_sync function
+    # send_packet_sync function
     
     async def receive_packet(self, with_ack=False, timeout=None):
         if timeout is None:
@@ -115,7 +115,7 @@ class AsyncPacketTransferProtocol:
         self.logger(f"header: {header}")
         self.logger(f"packet type: {packet_type}", f"payload len: {payload_len}",
             f"sequence num: {sequence_num}", f"payload ID: {payload_id}")
-		# future optim: tmp_stream in this function can be preallocated
+        # future optim: tmp_stream in this function can be preallocated
         tmp_stream = BytesIO()
         tmp_stream.write(packet[6:6 + payload_len])
         # self.logger(f"tmp stream before write: {self.tmp_stream.getvalue()}")
