@@ -206,16 +206,16 @@ async def main():
 			
 			# Update persistent data
 			if image_count > images_aware:
-				new_images = list(range(images_aware+1, image_count+1))
+				new_images = list(range(images_aware, image_count))
 				incomplete_images.extend(new_images)
 				images_aware = image_count
 					
 			# Request incomplete images
 			# To do: record reception time datetime.now().isoformat() and time taken
 			while True:
-				if images_aware not in incomplete_images: # most recent already received
+				if images_aware-1 not in incomplete_images: # most recent already received
 					break
-				image_id = images_aware # assume IDs are 1 to images_aware
+				image_id = images_aware-1 # assume IDs are 0 to images_aware-1
 				filename = f"image_{image_id}.jpeg"
 				local_path = f"received_images/image_{image_id}"
 				
