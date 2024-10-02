@@ -115,9 +115,9 @@ async def main():
 	
 	settings_hash = [-1] # hack to pass by reference
 	
-	CS = digitalio.DigitalInOut(board.D20)
+	CS = digitalio.DigitalInOut(board.D5)
 	CS.switch_to_output(True)
-	RST = digitalio.DigitalInOut(board.D21)
+	RST = digitalio.DigitalInOut(board.D6)
 	RST.switch_to_output(True)
 
 	RADIO_FREQ_MHZ = 437.4
