@@ -99,56 +99,60 @@ def verify_packet(packet, desired_type):
 		print(f"Packet is of undesired type {packet.categorize()}, not {desired_type}")
 		return False
 
+
 async def main():
-	print("Irvington CubeSat's Ground Station")
-	
-	# Constants
-	# Chip's buffer size: 256 bytes
-	# pycubed_rfm9x header size: 4 bytes
-	# pycubed_rfm9x CRC16 checksum size: 2 bytes (DOES NOT take away from available bytes)
-	# ptp header size: 6 bytes
-	MAX_PAYLOAD_SIZE = 256 - 4 - 6 # 246
-	# max length packets are bugged
-	MAX_PAYLOAD_SIZE = MAX_PAYLOAD_SIZE - 1
-	# msgpack adds 2 bytes overhead for bytes payloads
-	CHUNK_SIZE = MAX_PAYLOAD_SIZE - 2 # 244
-	
-	settings_hash = [-1] # hack to pass by reference
-	
-	CS = digitalio.DigitalInOut(board.D5)
-	CS.switch_to_output(True)
-	RST = digitalio.DigitalInOut(board.D6)
-	RST.switch_to_output(True)
+    print("Irvington CubeSat's Ground Station")
+    
+   
+    MAX_PAYLOAD_SIZE = 256 - 4 - 6  
+    MAX_PAYLOAD_SIZE -= 1  # 245 bytes
+    
+    CHUNK_SIZE = MAX_PAYLOAD_SIZE - 2  
+    
+    settings_hash = [-1]  # hack to pass by reference
+    
 
-	RADIO_FREQ_MHZ = 437.4
-	node = const(0xfb)
-	destination = const(0xfa)
-
-	radio = pycubed_rfm9x.RFM9x(board.SPI(), CS, RST, RADIO_FREQ_MHZ)
-	radio.spreading_factor = 8
-	radio.node = node
-	radio.destination = destination
-	radio.enable_crc = True
-	
-	# pool = attempt_wifi()
-	
-	ptp = APTP(radio, packet_size=MAX_PAYLOAD_SIZE, timeout=10, log=False, enable_padding=False)
-	ftp = FTP(ptp, chunk_size=CHUNK_SIZE, log=True)
-	
-	radio_diagnostics.report_diagnostics(radio)
-	
-	check_write_permissions()
-	
-	# Persistent data
+    CS = digitalio.DigitalInOut(board.D5)
+    CS.switch_to_output(True)
+    RST = digitalio.DigitalInOut(board.D6)
+    RST.switch_to_output(True)
+    
+  
+    RADIO_FREQ_MHZ = 437.4
+    node = const(0xfb)
+    destination = const(0xfa)
+    
+ 
+    radio = pycubed_rfm9x.RFM9x(board.SPI(), CS, RST, RADIO_FREQ_MHZ)
+    radio.spreading_factor = 8
+    radio.node = node
+    radio.destination = destination
+    radio.enable_crc = True
+    
+    ptp = APTP(radio, packet_size=MAX_PAYLOAD_SIZE, timeout=10, log=False, enable_padding=False)
+    ftp = FTP(ptp, chunk_size=CHUNK_SIZE, log=True)
+    
+    radio_diagnostics.report_diagnostics(radio)
+    
+    check_write_permissions()
+    
+    if os.path.exists("persistent_data.txt"):
+        try:
+            with open("persistent_data.txt", "r") as f:
+                images_aware = int(f.readline().strip())
+                incomplete_images = list(map(int, f.readline().strip().split()))
+                to_assemble = list(map(int, f.readline().strip().split()))
+        except Exception as e:
+            print(f"Error reading persistent data: {e}")
+            images_aware = 0
+            incomplete_images = []
+            to_assemble = []
+    else:
+        images_aware = 0
+        incomplete_images = []
+        to_assemble = []
 	try:
-		with open("persistent_data.txt") as f:
-			images_aware = int(f.readline())
-			incomplete_images = list(map(int, f.readline().split()))
-			to_assemble = list(map(int, f.readline().split()))
-	except: # First run
-		images_aware = 0
-		incomplete_images = []
-		to_assemble = []
+		
 	
 	def save_data():
 		with open("persistent_data.txt", "w") as f:
